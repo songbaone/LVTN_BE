@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Login Test</title>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 10px;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 12px;
+            overflow: auto;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Google Login Test</h2>
+
+    <!-- Google Sign In -->
+    <div id="g_id_onload"
+         data-client_id="65152859119-976obaec8uj3mcqa4am015ce1dodr76t.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse"
+         data-auto_prompt="false">
+    </div>
+
+    <div class="g_id_signin"
+         data-type="standard"
+         data-size="large"
+         data-theme="outline"
+         data-text="signin_with"
+         data-shape="rectangular"
+         data-logo_alignment="left">
+    </div>
+
+    <hr>
+
+    <h3>ID Token</h3>
+    <textarea id="token" rows="8" readonly></textarea>
+
+    <h3>Backend Response</h3>
+    <pre id="response"></pre>
+
+    <script>
+        async function handleCredentialResponse(response) {
+            const idToken = response.credential;
+
+            console.log("Google ID Token:", idToken);
+
+            document.getElementById("token").value = idToken;
+
+            try {
+                const apiResponse = await fetch(
+                    "http://localhost:3000/auth/google",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            id_token: idToken
+                        })
+                    }
+                );
+
+                const result = await apiResponse.json();
+
+                console.log("Backend Response:", result);
+
+                document.getElementById("response").textContent =
+                    JSON.stringify(result, null, 2);
+
+                if (apiResponse.ok) {
+                    alert("Đăng nhập Google thành công!");
+                } else {
+                    alert("Đăng nhập Google thất bại!");
+                }
+            } catch (error) {
+                console.error(error);
+
+                document.getElementById("response").textContent =
+                    error.message;
+
+                alert("Không thể kết nối backend!");
+            }
+        }
+    </script>
+
+</body>
+</html>
