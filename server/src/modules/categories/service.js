@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { db } = require('../../database/connection');
 const { TABLES } = require('../../config/constants');
 const { AppError } = require('../../middleware/errorHandler');
@@ -15,6 +16,12 @@ const CATEGORY_COLUMNS = [
   'created_at',
   'updated_at',
 ];
+
+function removeUploadedFile(file) {
+  if (file?.path && fs.existsSync(file.path)) {
+    fs.unlinkSync(file.path);
+  }
+}
 
 function parseCategoryId(categoryId) {
   const id = parseInt(categoryId, 10);
@@ -53,15 +60,19 @@ function mapTreeNode(record) {
     image_url: record.image_url ?? null,
     status: Boolean(record.status),
     parent_id: record.parent_id ?? null,
+    product_count: 0,
+    total_product_count: 0,
     children: [],
   };
 }
 
-function buildCategoryTree(categories) {
+function buildCategoryTree(categories, productCountMap = new Map()) {
   const nodeMap = new Map();
 
   categories.forEach((category) => {
-    nodeMap.set(category.category_id, mapTreeNode(category));
+    const node = mapTreeNode(category);
+    node.product_count = productCountMap.get(category.category_id) ?? 0;
+    nodeMap.set(category.category_id, node);
   });
 
   const roots = [];
@@ -75,6 +86,22 @@ function buildCategoryTree(categories) {
       roots.push(node);
     }
   });
+
+  function assignTotalProductCount(nodes) {
+    for (const node of nodes) {
+      if (node.children.length > 0) {
+        assignTotalProductCount(node.children);
+      }
+
+      node.total_product_count =
+        node.product_count +
+        node.children.reduce((sum, child) => sum + child.total_product_count, 0);
+
+      node.product_count = node.total_product_count;
+    }
+  }
+
+  assignTotalProductCount(roots);
 
   return roots;
 }
@@ -213,6 +240,37 @@ async function getCategories(queryParams) {
   };
 }
 
+async function getCategoryStatistics() {
+  const [
+    totalCategoriesResult,
+    activeCategoriesResult,
+    parentCategoriesResult,
+    totalProductsResult,
+  ] = await Promise.all([
+    db(TABLES.CATEGORIES).count({ count: 'category_id' }),
+    db(TABLES.CATEGORIES).where({ status: 1 }).count({ count: 'category_id' }),
+    db(TABLES.CATEGORIES).whereNull('parent_id').count({ count: 'category_id' }),
+    db(TABLES.PRODUCTS).where({ status: 1 }).count({ count: 'product_id' }),
+  ]);
+
+  const total_categories = Number(totalCategoriesResult[0]?.count ?? 0);
+  const active_categories = Number(activeCategoriesResult[0]?.count ?? 0);
+  const parent_categories = Number(parentCategoriesResult[0]?.count ?? 0);
+  const total_products = Number(totalProductsResult[0]?.count ?? 0);
+  const average_products_per_category =
+    total_categories > 0
+      ? Math.round((total_products / total_categories) * 100) / 100
+      : 0;
+
+  return {
+    total_categories,
+    active_categories,
+    total_products,
+    average_products_per_category,
+    parent_categories,
+  };
+}
+
 async function getCategoryTree(queryParams) {
   const filters = {
     status:
@@ -224,10 +282,21 @@ async function getCategoryTree(queryParams) {
   let query = db(TABLES.CATEGORIES).select(CATEGORY_COLUMNS);
   query = applyListFilters(query, filters);
 
-  const categories = await query.orderBy('category_name', 'asc');
+  const [categories, productCounts] = await Promise.all([
+    query.orderBy('category_name', 'asc'),
+    db(TABLES.PRODUCTS)
+      .select('category_id')
+      .where({ status: 1 })
+      .count({ count: 'product_id' })
+      .groupBy('category_id'),
+  ]);
+
+  const productCountMap = new Map(
+    productCounts.map((row) => [row.category_id, Number(row.count)])
+  );
 
   return {
-    tree: buildCategoryTree(categories),
+    tree: buildCategoryTree(categories, productCountMap),
   };
 }
 
@@ -245,7 +314,12 @@ async function getCategoryById(categoryIdParam) {
   };
 }
 
-async function createCategory(data) {
+async function createCategory(data, file = null) {
+  // Inject image_url from uploaded file if present
+  if (file) {
+    data.image_url = `/uploads/categories/${file.filename}`;
+  }
+
   const { category_name, parent_id, description, image_url, status } = data;
 
   await ensureCategoryNameAvailable(category_name);
@@ -275,14 +349,19 @@ async function createCategory(data) {
     status: status !== undefined ? parseInt(status, 10) : 1,
   };
 
-  await db(TABLES.CATEGORIES).insert(insertData);
+  try {
+    await db(TABLES.CATEGORIES).insert(insertData);
 
-  const category = await db(TABLES.CATEGORIES).where({ slug }).first();
+    const category = await db(TABLES.CATEGORIES).where({ slug }).first();
 
-  return getCategoryById(category.category_id);
+    return getCategoryById(category.category_id);
+  } catch (error) {
+    removeUploadedFile(file);
+    throw error;
+  }
 }
 
-async function updateCategory(categoryIdParam, data) {
+async function updateCategory(categoryIdParam, data, file = null) {
   const categoryId = parseCategoryId(categoryIdParam);
   const existing = await ensureCategoryExists(categoryId);
 
@@ -314,7 +393,9 @@ async function updateCategory(categoryIdParam, data) {
     updateData.description = data.description || null;
   }
 
-  if (data.image_url !== undefined) {
+  if (file) {
+    updateData.image_url = `/uploads/categories/${file.filename}`;
+  } else if (data.image_url !== undefined) {
     updateData.image_url = data.image_url || null;
   }
 
@@ -326,24 +407,63 @@ async function updateCategory(categoryIdParam, data) {
     throw new AppError('No valid fields to update', 400);
   }
 
-  await db(TABLES.CATEGORIES).where({ category_id: categoryId }).update(updateData);
+  try {
+    await db(TABLES.CATEGORIES).where({ category_id: categoryId }).update(updateData);
 
-  return getCategoryById(categoryId);
+    return getCategoryById(categoryId);
+  } catch (error) {
+    removeUploadedFile(file);
+    throw error;
+  }
 }
 
 async function deleteCategory(categoryIdParam) {
   const categoryId = parseCategoryId(categoryIdParam);
+
   await ensureCategoryExists(categoryId);
 
-  await db(TABLES.CATEGORIES).where({ category_id: categoryId }).update({
-    status: 0,
-  });
+  const childIds = await getChildCategoryIds(categoryId);
 
-  return getCategoryById(categoryId);
+  const idsToDelete = [
+    categoryId,
+    ...childIds,
+  ];
+
+  await db(TABLES.CATEGORIES)
+    .whereIn('category_id', idsToDelete)
+    .update({
+      status: 0,
+      updated_at: new Date(),
+    });
+
+  return {
+    deleted_count: idsToDelete.length,
+  };
+}
+
+
+async function getChildCategoryIds(parentId) {
+  const children = await db(TABLES.CATEGORIES)
+    .where({ parent_id: parentId });
+
+  let ids = [];
+
+  for (const child of children) {
+    ids.push(child.category_id);
+
+    const nestedIds = await getChildCategoryIds(
+      child.category_id
+    );
+
+    ids = [...ids, ...nestedIds];
+  }
+
+  return ids;
 }
 
 module.exports = {
   getCategories,
+  getCategoryStatistics,
   getCategoryTree,
   getCategoryById,
   createCategory,

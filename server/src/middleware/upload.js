@@ -70,13 +70,16 @@ function handleUpload(uploadMiddleware) {
 
 const brandLogoUpload = createImageUploader(UPLOAD_FOLDERS.BRANDS);
 const productImageUpload = createImageUploader(UPLOAD_FOLDERS.PRODUCTS);
+const categoryImageUpload = createImageUploader(UPLOAD_FOLDERS.CATEGORIES);
 
 const uploadBrandLogo = handleUpload(brandLogoUpload.single('logo'));
 const uploadProductImage = handleUpload(productImageUpload.single('image'));
 const uploadProductImages = handleUpload(productImageUpload.array('images', 10));
+const uploadCategoryImage = handleUpload(categoryImageUpload.single('image'));
 
 module.exports = {
   uploadBrandLogo,
   uploadProductImage,
   uploadProductImages,
+  uploadCategoryImage,
 };

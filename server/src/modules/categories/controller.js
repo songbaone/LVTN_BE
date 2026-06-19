@@ -31,9 +31,19 @@ async function getCategoryById(req, res, next) {
   }
 }
 
+async function getCategoryStatistics(req, res, next) {
+  try {
+    const result = await categoriesService.getCategoryStatistics();
+
+    return sendSuccess(res, 'Category statistics retrieved successfully', result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function createCategory(req, res, next) {
   try {
-    const category = await categoriesService.createCategory(req.body);
+    const category = await categoriesService.createCategory(req.body, req.file);
 
     return sendSuccess(res, 'Category created successfully', category, 201);
   } catch (error) {
@@ -45,7 +55,8 @@ async function updateCategory(req, res, next) {
   try {
     const category = await categoriesService.updateCategory(
       req.params.id,
-      req.body
+      req.body,
+      req.file
     );
 
     return sendSuccess(res, 'Category updated successfully', category);
@@ -66,6 +77,7 @@ async function deleteCategory(req, res, next) {
 
 module.exports = {
   getCategories,
+  getCategoryStatistics,
   getCategoryTree,
   getCategoryById,
   createCategory,

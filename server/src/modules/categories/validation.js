@@ -60,11 +60,6 @@ const createCategoryValidation = [
     .trim()
     .isLength({ max: 255 })
     .withMessage('Description must not exceed 255 characters'),
-  body('image_url')
-    .optional({ values: 'null' })
-    .trim()
-    .isLength({ max: 255 })
-    .withMessage('Image URL must not exceed 255 characters'),
   body('status')
     .optional()
     .isIn([0, 1, '0', '1'])
@@ -100,24 +95,19 @@ const updateCategoryValidation = [
     .trim()
     .isLength({ max: 255 })
     .withMessage('Description must not exceed 255 characters'),
-  body('image_url')
-    .optional({ values: 'null' })
-    .trim()
-    .isLength({ max: 255 })
-    .withMessage('Image URL must not exceed 255 characters'),
   body('status')
     .optional()
     .isIn([0, 1, '0', '1'])
     .withMessage('Status must be 0 or 1'),
   body().custom((_, { req }) => {
-    const { category_name, parent_id, description, image_url, status } = req.body;
+    const { category_name, parent_id, description, status } = req.body;
 
     if (
       category_name === undefined &&
       parent_id === undefined &&
       description === undefined &&
-      image_url === undefined &&
-      status === undefined
+      status === undefined &&
+      !req.file
     ) {
       throw new Error('At least one field must be provided to update');
     }
