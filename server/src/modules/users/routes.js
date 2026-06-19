@@ -18,6 +18,7 @@ router.use(authenticate);
 router.use(authorize(ROLES.ADMIN));
 
 router.get('/', listUsersQueryValidation, validate, controller.getUsers);
+router.get('/statistics', controller.getUserStatistics);
 router.get('/:id', userIdParamValidation, validate, controller.getUserById);
 router.put('/:id/role', updateRoleValidation, validate, controller.updateUserRole);
 router.put('/:id/lock', lockUserValidation, validate, controller.lockUser);

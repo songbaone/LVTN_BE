@@ -245,6 +245,18 @@ async function uploadBrandLogo(brandIdParam, file) {
   };
 }
 
+async function uploadBrandLogoStandalone(file) {
+  if (!file) {
+    throw new AppError('Logo file is required', 400);
+  }
+
+  const logo_url = `/uploads/brands/${file.filename}`;
+
+  return {
+    logo_url,
+  };
+}
+
 module.exports = {
   getBrands,
   getBrandById,
@@ -252,4 +264,5 @@ module.exports = {
   updateBrand,
   deleteBrand,
   uploadBrandLogo,
+  uploadBrandLogoStandalone,
 };

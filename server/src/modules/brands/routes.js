@@ -54,4 +54,12 @@ router.post(
   controller.uploadLogo
 );
 
+router.post(
+  '/upload-logo',
+  authenticate,
+  authorize(ROLES.ADMIN, ROLES.STAFF),
+  uploadBrandLogo,
+  controller.uploadLogoStandalone
+);
+
 module.exports = router;

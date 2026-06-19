@@ -61,6 +61,16 @@ async function uploadLogo(req, res, next) {
   }
 }
 
+async function uploadLogoStandalone(req, res, next) {
+  try {
+    const result = await brandsService.uploadBrandLogoStandalone(req.file);
+
+    return sendSuccess(res, 'Logo uploaded successfully', result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getBrands,
   getBrandById,
@@ -68,4 +78,5 @@ module.exports = {
   updateBrand,
   deleteBrand,
   uploadLogo,
+  uploadLogoStandalone,
 };

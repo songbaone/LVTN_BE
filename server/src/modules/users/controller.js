@@ -54,10 +54,21 @@ async function unlockUser(req, res, next) {
   }
 }
 
+async function getUserStatistics(req, res, next) {
+  try {
+    const statistics = await usersService.getUserStatistics();
+
+    return sendSuccess(res, 'User statistics retrieved successfully', statistics);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getUsers,
   getUserById,
   updateUserRole,
   lockUser,
   unlockUser,
+  getUserStatistics,
 };
