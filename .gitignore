@@ -6,3 +6,4 @@ uploads/temp/*
 .DS_Store
 .vscode/
 .clineignore
+uploads

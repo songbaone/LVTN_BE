@@ -33,7 +33,7 @@ async function createStaff(req, res, next) {
 
 async function updateStaff(req, res, next) {
   try {
-    const result = await staffService.updateStaff(req.params.id, req.body);
+    const result = await staffService.updateStaff(req.params.id, req.body, req.file);
 
     return sendSuccess(res, 'Staff updated successfully', result);
   } catch (error) {

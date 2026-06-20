@@ -43,10 +43,48 @@ const updateRoleValidation = [
 const lockUserValidation = [...userIdParamValidation];
 const unlockUserValidation = [...userIdParamValidation];
 
+const updateProfileValidation = [
+  body('full_name')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Full name cannot be empty')
+    .isLength({ max: 100 })
+    .withMessage('Full name must not exceed 100 characters'),
+  body('phone')
+    .optional({ values: 'null' })
+    .trim()
+    .isLength({ max: 15 })
+    .withMessage('Phone must not exceed 15 characters'),
+  body('gender')
+    .optional({ values: 'null' })
+    .trim()
+    .isLength({ max: 10 })
+    .withMessage('Gender must not exceed 10 characters'),
+  body('birth_date')
+    .optional({ values: 'null' })
+    .isISO8601()
+    .withMessage('Birth date must be a valid date'),
+  body().custom((_, { req }) => {
+    const { full_name, phone, gender, birth_date } = req.body;
+    if (
+      full_name === undefined &&
+      phone === undefined &&
+      gender === undefined &&
+      birth_date === undefined &&
+      !req.file
+    ) {
+      throw new Error('At least one field or avatar must be provided to update');
+    }
+    return true;
+  }),
+];
+
 module.exports = {
   userIdParamValidation,
   listUsersQueryValidation,
   updateRoleValidation,
   lockUserValidation,
   unlockUserValidation,
+  updateProfileValidation,
 };

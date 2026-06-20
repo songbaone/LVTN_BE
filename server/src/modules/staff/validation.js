@@ -71,22 +71,17 @@ const updateStaffValidation = [
     .optional({ values: 'null' })
     .isISO8601()
     .withMessage('Birth date must be a valid date'),
-  body('avatar')
-    .optional({ values: 'null' })
-    .trim()
-    .isLength({ max: 255 })
-    .withMessage('Avatar URL must not exceed 255 characters'),
   body().custom((_, { req }) => {
-    const { full_name, email, phone, gender, birth_date, avatar } = req.body;
+    const { full_name, email, phone, gender, birth_date } = req.body;
     if (
       full_name === undefined &&
       email === undefined &&
       phone === undefined &&
       gender === undefined &&
       birth_date === undefined &&
-      avatar === undefined
+      !req.file
     ) {
-      throw new Error('At least one field must be provided to update');
+      throw new Error('At least one field or avatar must be provided to update');
     }
     return true;
   }),

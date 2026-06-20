@@ -1,8 +1,15 @@
+const fs = require('fs');
 const { db } = require('../../database/connection');
 const { TABLES } = require('../../config/constants');
 const { AppError } = require('../../middleware/errorHandler');
 const { getPagination, buildPaginationMeta } = require('../../utils/pagination');
 const { hashPassword } = require('../../utils/password');
+
+function removeUploadedFile(file) {
+  if (file?.path && fs.existsSync(file.path)) {
+    fs.unlinkSync(file.path);
+  }
+}
 
 const ALLOWED_SORT_FIELDS = ['created_at', 'full_name', 'email', 'status', 'user_id'];
 const DEFAULT_SORT_FIELD = 'Users.created_at';
@@ -433,6 +440,49 @@ async function getUserStatistics() {
   };
 }
 
+async function updateProfile(userId, data, file = null) {
+  await ensureUserExists(userId);
+
+  if (data.phone !== undefined) {
+    await ensurePhoneAvailable(data.phone, userId);
+  }
+
+  const updateData = {};
+
+  if (data.full_name !== undefined) {
+    updateData.full_name = data.full_name;
+  }
+
+  if (data.phone !== undefined) {
+    updateData.phone = data.phone || null;
+  }
+
+  if (data.gender !== undefined) {
+    updateData.gender = data.gender || null;
+  }
+
+  if (data.birth_date !== undefined) {
+    updateData.birth_date = data.birth_date || null;
+  }
+
+  if (file) {
+    updateData.avatar = `/uploads/avatars/${file.filename}`;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new AppError('No valid fields to update', 400);
+  }
+
+  try {
+    await db(TABLES.USERS).where({ user_id: userId }).update(updateData);
+
+    return getUserById(userId);
+  } catch (error) {
+    removeUploadedFile(file);
+    throw error;
+  }
+}
+
 module.exports = {
   getUsers,
   getUserById,
@@ -442,4 +492,5 @@ module.exports = {
   createUser,
   updateUser,
   getUserStatistics,
+  updateProfile,
 };

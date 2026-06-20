@@ -1,8 +1,15 @@
+const fs = require('fs');
 const { db } = require('../../database/connection');
 const { TABLES, ROLES } = require('../../config/constants');
 const { AppError } = require('../../middleware/errorHandler');
 const { getPagination, buildPaginationMeta } = require('../../utils/pagination');
 const { hashPassword } = require('../../utils/password');
+
+function removeUploadedFile(file) {
+  if (file?.path && fs.existsSync(file.path)) {
+    fs.unlinkSync(file.path);
+  }
+}
 
 function parseStaffId(staffId) {
   const id = parseInt(staffId, 10);
@@ -236,7 +243,7 @@ async function createStaff(data) {
   return getStaffById(inserted[0].user_id);
 }
 
-async function updateStaff(staffIdParam, data) {
+async function updateStaff(staffIdParam, data, file = null) {
   const staffId = parseStaffId(staffIdParam);
 
   await ensureUserExists(staffId);
@@ -271,17 +278,22 @@ async function updateStaff(staffIdParam, data) {
     updateData.birth_date = data.birth_date || null;
   }
 
-  if (data.avatar !== undefined) {
-    updateData.avatar = data.avatar || null;
+  if (file) {
+    updateData.avatar = `/uploads/avatars/${file.filename}`;
   }
 
   if (Object.keys(updateData).length === 0) {
     throw new AppError('No valid fields to update', 400);
   }
 
-  await db(TABLES.USERS).where({ user_id: staffId }).update(updateData);
+  try {
+    await db(TABLES.USERS).where({ user_id: staffId }).update(updateData);
 
-  return getStaffById(staffId);
+    return getStaffById(staffId);
+  } catch (error) {
+    removeUploadedFile(file);
+    throw error;
+  }
 }
 
 async function lockStaff(staffIdParam) {

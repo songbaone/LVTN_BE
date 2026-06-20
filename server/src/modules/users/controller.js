@@ -64,6 +64,16 @@ async function getUserStatistics(req, res, next) {
   }
 }
 
+async function updateProfile(req, res, next) {
+  try {
+    const result = await usersService.updateProfile(req.user.user_id, req.body, req.file);
+
+    return sendSuccess(res, 'Profile updated successfully', result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getUsers,
   getUserById,
@@ -71,4 +81,5 @@ module.exports = {
   lockUser,
   unlockUser,
   getUserStatistics,
+  updateProfile,
 };
