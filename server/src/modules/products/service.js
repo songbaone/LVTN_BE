@@ -13,6 +13,8 @@ const PRODUCT_COLUMNS = [
   'Products.sku',
   'Products.category_id',
   'Products.brand_id',
+  'Categories.category_name',
+  'Brands.brand_name',
   'Products.description',
   'Products.short_description',
   'Products.thumbnail',
@@ -47,7 +49,9 @@ function mapProduct(record) {
     slug: record.slug,
     sku: record.sku,
     category_id: record.category_id,
+    category_name: record.category_name ?? null,
     brand_id: record.brand_id,
+    brand_name: record.brand_name ?? null,
     description: record.description ?? null,
     short_description: record.short_description ?? null,
     thumbnail: record.thumbnail ?? null,
@@ -106,57 +110,12 @@ function mapImage(record) {
   };
 }
 
-function mapVariant(record) {
-  return {
-    variant_id: record.variant_id,
-    product_id: record.product_id,
-    size: record.size ?? null,
-    color: record.color ?? null,
-    material: record.material ?? null,
-    additional_price: Number(record.additional_price ?? 0),
-    stock_quantity: Number(record.stock_quantity ?? 0),
-    sku: record.sku,
-    created_at: record.created_at,
-    updated_at: record.updated_at,
-  };
-}
-
-function buildSku() {
-  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `SKU-${Date.now()}-${randomPart}`;
-}
-
-function buildVariantSku(productId) {
-  const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `VAR-${productId}-${Date.now()}-${randomPart}`;
-}
-
 function removeUploadedFiles(files = []) {
   files.forEach((file) => {
     if (file?.path && fs.existsSync(file.path)) {
       fs.unlinkSync(file.path);
     }
   });
-}
-
-function parseVariantsInput(variantsValue) {
-  if (variantsValue === undefined || variantsValue === null || variantsValue === '') {
-    return [];
-  }
-
-  let parsed;
-
-  try {
-    parsed = typeof variantsValue === 'string' ? JSON.parse(variantsValue) : variantsValue;
-  } catch {
-    throw new AppError('Variants must be a valid JSON array', 400);
-  }
-
-  if (!Array.isArray(parsed)) {
-    throw new AppError('Variants must be a JSON array', 400);
-  }
-
-  return parsed;
 }
 
 function parseMainImageIndex(value, filesLength) {
@@ -286,23 +245,9 @@ async function generateUniqueSku(trx = db) {
   throw new AppError('Unable to generate a unique SKU', 500);
 }
 
-async function generateUniqueVariantSku(trx, productId) {
-  let sku = buildVariantSku(productId);
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  while (attempts < maxAttempts) {
-    const existing = await trx(TABLES.PRODUCT_VARIANTS).where({ sku }).first();
-
-    if (!existing) {
-      return sku;
-    }
-
-    sku = buildVariantSku(productId);
-    attempts += 1;
-  }
-
-  throw new AppError('Unable to generate a unique variant SKU', 500);
+function buildSku() {
+  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `SKU-${Date.now()}-${randomPart}`;
 }
 
 async function ensureCategoryExists(categoryId, trx = db) {
@@ -339,30 +284,16 @@ async function ensureProductExists(productId, trx = db) {
   return product;
 }
 
-async function ensureVariantBelongsToProduct(trx, productId, variantId) {
-  const variant = await trx(TABLES.PRODUCT_VARIANTS)
-    .where({ variant_id: variantId, product_id: productId })
-    .first();
-
-  if (!variant) {
-    throw new AppError(`Variant ${variantId} not found for this product`, 404);
-  }
-
-  return variant;
-}
-
 function buildDetailQuery(trx = db) {
   return trx(TABLES.PRODUCTS)
     .join(TABLES.CATEGORIES, 'Products.category_id', 'Categories.category_id')
     .join(TABLES.BRANDS, 'Products.brand_id', 'Brands.brand_id')
     .select([
       ...PRODUCT_COLUMNS,
-      'Categories.category_name',
       'Categories.slug as category_slug',
       'Categories.description as category_description',
       'Categories.image_url as category_image_url',
       'Categories.status as category_status',
-      'Brands.brand_name',
       'Brands.logo_url as brand_logo_url',
       'Brands.country as brand_country',
       'Brands.description as brand_description',
@@ -380,12 +311,27 @@ async function getProductImages(productId, trx = db) {
   return images.map(mapImage);
 }
 
-async function getProductVariants(productId, trx = db) {
-  const variants = await trx(TABLES.PRODUCT_VARIANTS)
-    .where({ product_id: productId })
-    .orderBy('variant_id', 'asc');
+async function getVariantAggregates(productIds) {
+  if (!productIds.length) {
+    return {};
+  }
 
-  return variants.map(mapVariant);
+  const rows = await db(TABLES.PRODUCT_VARIANTS)
+    .select('product_id')
+    .count({ count: 'variant_id' })
+    .sum({ stock: 'stock_quantity' })
+    .whereIn('product_id', productIds)
+    .groupBy('product_id');
+
+  const result = {};
+  rows.forEach((row) => {
+    result[row.product_id] = {
+      variant_count: Number(row.count),
+      total_stock: Number(row.stock) || 0,
+    };
+  });
+
+  return result;
 }
 
 async function insertProductImages(trx, productId, files, mainImageIndex) {
@@ -436,118 +382,6 @@ async function setMainImageForProduct(trx, productId, mainImageId) {
       .where({ product_id: productId })
       .update({ thumbnail: mainImage.image_url });
   }
-}
-
-async function insertVariants(trx, productId, variants) {
-  const insertedVariants = [];
-
-  for (const variant of variants) {
-    if (variant.variant_id) {
-      continue;
-    }
-
-    const sku =
-      variant.sku && String(variant.sku).trim()
-        ? String(variant.sku).trim()
-        : await generateUniqueVariantSku(trx, productId);
-
-    if (variant.sku && String(variant.sku).trim()) {
-      const existingSku = await trx(TABLES.PRODUCT_VARIANTS)
-        .where({ sku })
-        .first();
-
-      if (existingSku) {
-        throw new AppError(`Variant SKU ${sku} already exists`, 409);
-      }
-    }
-
-    await trx(TABLES.PRODUCT_VARIANTS).insert({
-      product_id: productId,
-      size: variant.size || null,
-      color: variant.color || null,
-      material: variant.material || null,
-      additional_price:
-        variant.additional_price !== undefined
-          ? parseFloat(variant.additional_price)
-          : 0,
-      stock_quantity:
-        variant.stock_quantity !== undefined
-          ? parseInt(variant.stock_quantity, 10)
-          : 0,
-      sku,
-    });
-
-    const inserted = await trx(TABLES.PRODUCT_VARIANTS)
-      .where({ product_id: productId, sku })
-      .first();
-
-    insertedVariants.push(inserted);
-  }
-
-  return insertedVariants;
-}
-
-async function updateVariants(trx, productId, variants) {
-  const updatedVariants = [];
-
-  for (const variant of variants) {
-    if (!variant.variant_id) {
-      continue;
-    }
-
-    const variantId = parseInt(variant.variant_id, 10);
-    await ensureVariantBelongsToProduct(trx, productId, variantId);
-
-    const updateData = {};
-
-    if (variant.size !== undefined) {
-      updateData.size = variant.size || null;
-    }
-
-    if (variant.color !== undefined) {
-      updateData.color = variant.color || null;
-    }
-
-    if (variant.material !== undefined) {
-      updateData.material = variant.material || null;
-    }
-
-    if (variant.additional_price !== undefined) {
-      updateData.additional_price = parseFloat(variant.additional_price);
-    }
-
-    if (variant.stock_quantity !== undefined) {
-      updateData.stock_quantity = parseInt(variant.stock_quantity, 10);
-    }
-
-    if (variant.sku !== undefined && variant.sku) {
-      const trimmedSku = String(variant.sku).trim();
-      const existingSku = await trx(TABLES.PRODUCT_VARIANTS)
-        .where({ sku: trimmedSku })
-        .whereNot({ variant_id: variantId })
-        .first();
-
-      if (existingSku) {
-        throw new AppError(`Variant SKU ${trimmedSku} already exists`, 409);
-      }
-
-      updateData.sku = trimmedSku;
-    }
-
-    if (Object.keys(updateData).length > 0) {
-      await trx(TABLES.PRODUCT_VARIANTS)
-        .where({ variant_id: variantId })
-        .update(updateData);
-    }
-
-    const updated = await trx(TABLES.PRODUCT_VARIANTS)
-      .where({ variant_id: variantId })
-      .first();
-
-    updatedVariants.push(updated);
-  }
-
-  return updatedVariants;
 }
 
 function applyListFilters(query, filters, tablePrefix = '') {
@@ -627,31 +461,73 @@ async function getProducts(queryParams) {
   const countResult = await countQuery.count({ total: 'product_id' });
   const total = Number(countResult[0]?.total ?? 0);
 
-  let listQuery = db(TABLES.PRODUCTS).select(
-    'product_id',
-    'product_name',
-    'slug',
-    'sku',
-    'category_id',
-    'brand_id',
-    'short_description',
-    'thumbnail',
-    'price',
-    'discount_price',
-    'age_from',
-    'age_to',
-    'status',
-    'created_at'
-  );
-  listQuery = applyListFilters(listQuery, filters);
+  let listQuery = db(TABLES.PRODUCTS)
+    .leftJoin(TABLES.CATEGORIES, 'Products.category_id', 'Categories.category_id')
+    .leftJoin(TABLES.BRANDS, 'Products.brand_id', 'Brands.brand_id')
+    .select(
+      'Products.product_id',
+      'Products.product_name',
+      'Products.slug',
+      'Products.sku',
+      'Products.category_id',
+      'Products.brand_id',
+      'Categories.category_name',
+      'Brands.brand_name',
+      'Products.short_description',
+      'Products.description',
+      'Products.thumbnail',
+      'Products.price',
+      'Products.discount_price',
+      'Products.age_from',
+      'Products.age_to',
+      'Products.status',
+      'Products.created_at'
+    );
+  listQuery = applyListFilters(listQuery, filters, 'Products.');
 
   const products = await listQuery
-    .orderBy('created_at', 'desc')
+    .orderBy('Products.created_at', 'desc')
     .offset(offset)
     .limit(limit);
 
+  const productIds = products.map((p) => p.product_id);
+
+  let imagesByProduct = {};
+
+  if (productIds.length > 0) {
+    const allImages = await db(TABLES.PRODUCT_IMAGES)
+      .select('image_id', 'product_id', 'image_url', 'is_main')
+      .whereIn('product_id', productIds)
+      .orderBy('is_main', 'desc')
+      .orderBy('image_id', 'asc');
+
+    imagesByProduct = allImages.reduce((acc, img) => {
+      if (!acc[img.product_id]) {
+        acc[img.product_id] = [];
+      }
+      acc[img.product_id].push(mapImage(img));
+      return acc;
+    }, {});
+  }
+
+  const variantAggs = await getVariantAggregates(productIds);
+
+  const productsWithImages = products.map((product) => {
+    const productImages = imagesByProduct[product.product_id] || [];
+    const mainImage = productImages.find((img) => img.is_main) || productImages[0] || null;
+    const aggs = variantAggs[product.product_id] || {};
+
+    return {
+      ...mapProduct(product),
+      thumbnail: mainImage?.image_url || null,
+      images: productImages,
+      variant_count: aggs.variant_count || 0,
+      total_stock: aggs.total_stock || 0,
+    };
+  });
+
   return {
-    products: products.map(mapProduct),
+    products: productsWithImages,
     pagination: buildPaginationMeta(total, page, limit),
   };
 }
@@ -667,23 +543,29 @@ async function getProductById(productIdParam) {
     throw new AppError('Product not found', 404);
   }
 
-  const [images, variants] = await Promise.all([
+  const [images, agg] = await Promise.all([
     getProductImages(productId),
-    getProductVariants(productId),
+    getVariantAggregates([productId]),
   ]);
 
+  const mainImage = images.find((img) => img.is_main) || images[0] || null;
+  const aggs = agg[productId] || {};
+
   return {
-    product: mapProduct(record),
+    product: {
+      ...mapProduct(record),
+      thumbnail: mainImage?.image_url || null,
+      images,
+      variant_count: aggs.variant_count || 0,
+      total_stock: aggs.total_stock || 0,
+    },
     category: mapCategoryInfo(record),
     brand: mapBrandInfo(record),
-    images,
-    variants,
   };
 }
 
 async function createProduct(body, files = []) {
   const uploadedFiles = Array.isArray(files) ? files : [];
-  const variants = parseVariantsInput(body.variants);
   const mainImageIndex = parseMainImageIndex(body.main_image_index, uploadedFiles.length);
 
   await ensureCategoryExists(parseInt(body.category_id, 10));
@@ -724,10 +606,6 @@ async function createProduct(body, files = []) {
             .update({ thumbnail: mainImage.image_url });
         }
       }
-
-      if (variants.length > 0) {
-        await insertVariants(trx, productId, variants);
-      }
     });
   } catch (error) {
     removeUploadedFiles(uploadedFiles);
@@ -740,7 +618,6 @@ async function createProduct(body, files = []) {
 async function updateProduct(productIdParam, body, files = []) {
   const productId = parseProductId(productIdParam);
   const uploadedFiles = Array.isArray(files) ? files : [];
-  const variants = parseVariantsInput(body.variants);
   const mainImageIndex = parseMainImageIndex(
     body.main_image_index,
     uploadedFiles.length
@@ -768,27 +645,59 @@ async function updateProduct(productIdParam, body, files = []) {
     );
   }
 
+  // Parse image management fields
+  let deleteImageIds = [];
+  if (body.delete_image_ids !== undefined && body.delete_image_ids !== null) {
+    deleteImageIds = Array.isArray(body.delete_image_ids)
+      ? body.delete_image_ids.map((id) => parseInt(id, 10))
+      : [];
+  }
+
+  let mainImageId = null;
+  if (body.main_image_id !== undefined && body.main_image_id !== null) {
+    mainImageId = parseInt(body.main_image_id, 10);
+  }
+
   try {
     await db.transaction(async (trx) => {
+      // 1. Update product fields
       if (Object.keys(updateData).length > 0) {
         await trx(TABLES.PRODUCTS).where({ product_id: productId }).update(updateData);
       }
 
+      // 2. Delete specified images
+      if (deleteImageIds.length > 0) {
+        const imagesToDelete = await trx(TABLES.PRODUCT_IMAGES)
+          .whereIn('image_id', deleteImageIds)
+          .where({ product_id: productId });
+
+        for (const image of imagesToDelete) {
+          removeLocalLogoFile(image.image_url);
+        }
+
+        await trx(TABLES.PRODUCT_IMAGES)
+          .whereIn('image_id', deleteImageIds)
+          .where({ product_id: productId })
+          .del();
+      }
+
+      // 3. Upload new images
+      let insertedImages = [];
       if (uploadedFiles.length > 0) {
-        const existingImageCountResult = await trx(TABLES.PRODUCT_IMAGES)
+        const remainingCountResult = await trx(TABLES.PRODUCT_IMAGES)
           .where({ product_id: productId })
           .count({ count: '*' });
-        const hasExistingImages = Number(existingImageCountResult[0]?.count ?? 0) > 0;
+        const remainingCount = Number(remainingCountResult[0]?.count ?? 0);
 
+        // If no existing images remain, first uploaded image becomes main by default
         let imageMainIndex;
-
         if (body.main_image_index !== undefined) {
           imageMainIndex = mainImageIndex;
-        } else if (!hasExistingImages) {
+        } else if (remainingCount === 0) {
           imageMainIndex = 0;
         }
 
-        const insertedImages = await insertProductImages(
+        insertedImages = await insertProductImages(
           trx,
           productId,
           uploadedFiles,
@@ -798,14 +707,66 @@ async function updateProduct(productIdParam, body, files = []) {
         if (body.main_image_index !== undefined) {
           const selectedMainImage = insertedImages[mainImageIndex];
           await setMainImageForProduct(trx, productId, selectedMainImage.image_id);
-        } else if (!hasExistingImages && insertedImages.length > 0) {
-          await setMainImageForProduct(trx, productId, insertedImages[0].image_id);
+        } else if (remainingCount === 0 && insertedImages.length > 0) {
+          // First new image becomes main when no other images exist
+          await trx(TABLES.PRODUCT_IMAGES)
+            .where({ product_id: productId })
+            .update({ is_main: 0 });
+          await trx(TABLES.PRODUCT_IMAGES)
+            .where({ image_id: insertedImages[0].image_id })
+            .update({ is_main: 1 });
         }
       }
 
-      if (variants.length > 0) {
-        await updateVariants(trx, productId, variants);
-        await insertVariants(trx, productId, variants);
+      // 4. Set main image by existing image_id
+      if (mainImageId !== null) {
+        // Verify the image belongs to this product
+        const targetImage = await trx(TABLES.PRODUCT_IMAGES)
+          .where({ image_id: mainImageId, product_id: productId })
+          .first();
+
+        if (targetImage) {
+          await trx(TABLES.PRODUCT_IMAGES)
+            .where({ product_id: productId })
+            .update({ is_main: 0 });
+
+          await trx(TABLES.PRODUCT_IMAGES)
+            .where({ image_id: mainImageId })
+            .update({ is_main: 1 });
+        }
+      }
+
+      // 5. Ensure at least one main image exists if images remain
+      const allRemainingImages = await trx(TABLES.PRODUCT_IMAGES)
+        .where({ product_id: productId })
+        .orderBy('is_main', 'desc')
+        .orderBy('image_id', 'asc');
+
+      if (allRemainingImages.length > 0) {
+        const hasMain = allRemainingImages.some((img) => img.is_main === 1);
+
+        if (!hasMain) {
+          // Promote first image to main
+          await trx(TABLES.PRODUCT_IMAGES)
+            .where({ image_id: allRemainingImages[0].image_id })
+            .update({ is_main: 1 });
+        }
+
+        // Update product thumbnail with current main image
+        const mainImg = await trx(TABLES.PRODUCT_IMAGES)
+          .where({ product_id: productId, is_main: 1 })
+          .first();
+
+        const thumbnailUrl = mainImg ? mainImg.image_url : allRemainingImages[0].image_url;
+
+        await trx(TABLES.PRODUCTS)
+          .where({ product_id: productId })
+          .update({ thumbnail: thumbnailUrl });
+      } else {
+        // No images remain, clear thumbnail
+        await trx(TABLES.PRODUCTS)
+          .where({ product_id: productId })
+          .update({ thumbnail: null });
       }
     });
   } catch (error) {
@@ -825,6 +786,19 @@ async function deleteProduct(productIdParam) {
   });
 
   return getProductById(productId);
+}
+
+function removeLocalLogoFile(logoUrl) {
+  if (!logoUrl || !logoUrl.startsWith('/uploads/')) {
+    return;
+  }
+
+  const relativePath = logoUrl.replace('/uploads/', '');
+  const absolutePath = path.join(UPLOADS_DIR, relativePath);
+
+  if (fs.existsSync(absolutePath)) {
+    fs.unlinkSync(absolutePath);
+  }
 }
 
 module.exports = {

@@ -48,55 +48,6 @@ const listProductsQueryValidation = [
     .withMessage('Status must be 0 (inactive) or 1 (active)'),
 ];
 
-function validateVariantsJson(value) {
-  if (value === undefined || value === null || value === '') {
-    return true;
-  }
-
-  let parsed;
-
-  try {
-    parsed = typeof value === 'string' ? JSON.parse(value) : value;
-  } catch {
-    throw new Error('Variants must be a valid JSON array');
-  }
-
-  if (!Array.isArray(parsed)) {
-    throw new Error('Variants must be a JSON array');
-  }
-
-  parsed.forEach((variant, index) => {
-    if (!variant || typeof variant !== 'object') {
-      throw new Error(`Variant at index ${index} must be an object`);
-    }
-
-    if (variant.variant_id !== undefined) {
-      const variantId = parseInt(variant.variant_id, 10);
-
-      if (Number.isNaN(variantId) || variantId < 1) {
-        throw new Error(`Variant at index ${index} has an invalid variant_id`);
-      }
-    }
-
-    if (
-      variant.stock_quantity !== undefined &&
-      (Number.isNaN(parseInt(variant.stock_quantity, 10)) ||
-        parseInt(variant.stock_quantity, 10) < 0)
-    ) {
-      throw new Error(`Variant at index ${index} has an invalid stock_quantity`);
-    }
-
-    if (
-      variant.additional_price !== undefined &&
-      Number.isNaN(parseFloat(variant.additional_price))
-    ) {
-      throw new Error(`Variant at index ${index} has an invalid additional_price`);
-    }
-  });
-
-  return true;
-}
-
 const createProductValidation = [
   body('product_name')
     .trim()
@@ -147,7 +98,6 @@ const createProductValidation = [
     .optional()
     .isIn([0, 1, '0', '1'])
     .withMessage('Status must be 0 or 1'),
-  body('variants').optional().custom(validateVariantsJson),
   body('main_image_index')
     .optional()
     .isInt({ min: 0 })
@@ -226,11 +176,39 @@ const updateProductValidation = [
     .optional()
     .isIn([0, 1, '0', '1'])
     .withMessage('Status must be 0 or 1'),
-  body('variants').optional().custom(validateVariantsJson),
   body('main_image_index')
     .optional()
     .isInt({ min: 0 })
     .withMessage('Main image index must be a non-negative integer'),
+  body('delete_image_ids')
+    .optional({ values: 'null' })
+    .customSanitizer((value) => {
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
+      }
+      return value;
+    })
+    .isArray({ min: 1 })
+    .withMessage('delete_image_ids must be a non-empty array'),
+  body('delete_image_ids.*')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Each delete_image_ids value must be a positive integer'),
+  body('main_image_id')
+    .optional({ values: 'null' })
+    .customSanitizer((value) => {
+      if (typeof value === 'string') {
+        const parsed = parseInt(value, 10);
+        return Number.isNaN(parsed) ? value : parsed;
+      }
+      return value;
+    })
+    .isInt({ min: 1 })
+    .withMessage('main_image_id must be a positive integer'),
   body().custom((_, { req }) => {
     const files = req.files || [];
     const productFields = [
@@ -250,15 +228,17 @@ const updateProductValidation = [
     const hasProductField = productFields.some(
       (field) => req.body[field] !== undefined
     );
-    const hasVariants =
-      req.body.variants !== undefined &&
-      req.body.variants !== null &&
-      req.body.variants !== '';
     const hasImages = files.length > 0;
+    const hasDeleteImageIds =
+      req.body.delete_image_ids !== undefined &&
+      req.body.delete_image_ids !== null;
+    const hasMainImageId =
+      req.body.main_image_id !== undefined &&
+      req.body.main_image_id !== null;
 
-    if (!hasProductField && !hasVariants && !hasImages) {
+    if (!hasProductField && !hasImages && !hasDeleteImageIds && !hasMainImageId) {
       throw new Error(
-        'At least one product field, variants payload, or image upload is required'
+        'At least one product field, image upload, delete_image_ids, or main_image_id is required'
       );
     }
 
