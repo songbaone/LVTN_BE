@@ -54,11 +54,6 @@ const createBrandValidation = [
     .trim()
     .isLength({ max: 255 })
     .withMessage('Description must not exceed 255 characters'),
-  body('logo_url')
-    .optional({ values: 'null' })
-    .trim()
-    .isLength({ max: 255 })
-    .withMessage('Logo URL must not exceed 255 characters'),
   body('status')
     .optional()
     .isIn([0, 1, '0', '1'])
@@ -84,26 +79,21 @@ const updateBrandValidation = [
     .trim()
     .isLength({ max: 255 })
     .withMessage('Description must not exceed 255 characters'),
-  body('logo_url')
-    .optional({ values: 'null' })
-    .trim()
-    .isLength({ max: 255 })
-    .withMessage('Logo URL must not exceed 255 characters'),
   body('status')
     .optional()
     .isIn([0, 1, '0', '1'])
     .withMessage('Status must be 0 or 1'),
   body().custom((_, { req }) => {
-    const { brand_name, country, description, logo_url, status } = req.body;
+    const { brand_name, country, description, status } = req.body;
 
     if (
       brand_name === undefined &&
       country === undefined &&
       description === undefined &&
-      logo_url === undefined &&
-      status === undefined
+      status === undefined &&
+      !req.file
     ) {
-      throw new Error('At least one field must be provided to update');
+      throw new Error('At least one field or logo must be provided to update');
     }
 
     return true;

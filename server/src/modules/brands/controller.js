@@ -23,7 +23,7 @@ async function getBrandById(req, res, next) {
 
 async function createBrand(req, res, next) {
   try {
-    const brand = await brandsService.createBrand(req.body);
+    const brand = await brandsService.createBrand(req.body, req.file);
 
     return sendSuccess(res, 'Brand created successfully', brand, 201);
   } catch (error) {
@@ -33,7 +33,7 @@ async function createBrand(req, res, next) {
 
 async function updateBrand(req, res, next) {
   try {
-    const brand = await brandsService.updateBrand(req.params.id, req.body);
+    const brand = await brandsService.updateBrand(req.params.id, req.body, req.file);
 
     return sendSuccess(res, 'Brand updated successfully', brand);
   } catch (error) {

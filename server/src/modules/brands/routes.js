@@ -21,6 +21,7 @@ router.post(
   '/',
   authenticate,
   authorize(ROLES.ADMIN, ROLES.STAFF),
+  uploadBrandLogo,
   createBrandValidation,
   validate,
   controller.createBrand
@@ -30,6 +31,7 @@ router.put(
   '/:id',
   authenticate,
   authorize(ROLES.ADMIN, ROLES.STAFF),
+  uploadBrandLogo,
   updateBrandValidation,
   validate,
   controller.updateBrand

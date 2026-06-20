@@ -149,27 +149,36 @@ async function getBrandById(brandIdParam) {
   };
 }
 
-async function createBrand(data) {
-  const { brand_name, country, description, logo_url, status } = data;
+async function createBrand(data, file = null) {
+  const { brand_name, country, description, status } = data;
 
   await ensureBrandNameAvailable(brand_name);
+
+  const logo_url = file ? `/uploads/brands/${file.filename}` : null;
 
   const insertData = {
     brand_name,
     country: country ?? null,
     description: description ?? null,
-    logo_url: logo_url ?? null,
+    logo_url,
     status: status !== undefined ? parseInt(status, 10) : 1,
   };
 
-  await db(TABLES.BRANDS).insert(insertData);
+  try {
+    await db(TABLES.BRANDS).insert(insertData);
 
-  const brand = await db(TABLES.BRANDS).where({ brand_name }).first();
+    const brand = await db(TABLES.BRANDS).where({ brand_name }).first();
 
-  return getBrandById(brand.brand_id);
+    return getBrandById(brand.brand_id);
+  } catch (error) {
+    if (file) {
+      removeLocalLogoFile(logo_url);
+    }
+    throw error;
+  }
 }
 
-async function updateBrand(brandIdParam, data) {
+async function updateBrand(brandIdParam, data, file = null) {
   const brandId = parseBrandId(brandIdParam);
   await ensureBrandExists(brandId);
 
@@ -188,8 +197,8 @@ async function updateBrand(brandIdParam, data) {
     updateData.description = data.description || null;
   }
 
-  if (data.logo_url !== undefined) {
-    updateData.logo_url = data.logo_url || null;
+  if (file) {
+    updateData.logo_url = `/uploads/brands/${file.filename}`;
   }
 
   if (data.status !== undefined) {
@@ -200,9 +209,16 @@ async function updateBrand(brandIdParam, data) {
     throw new AppError('No valid fields to update', 400);
   }
 
-  await db(TABLES.BRANDS).where({ brand_id: brandId }).update(updateData);
+  try {
+    await db(TABLES.BRANDS).where({ brand_id: brandId }).update(updateData);
 
-  return getBrandById(brandId);
+    return getBrandById(brandId);
+  } catch (error) {
+    if (file) {
+      removeLocalLogoFile(updateData.logo_url);
+    }
+    throw error;
+  }
 }
 
 async function deleteBrand(brandIdParam) {
