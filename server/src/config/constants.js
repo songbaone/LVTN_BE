@@ -53,6 +53,7 @@ const TABLES = Object.freeze({
   PAYMENTS: 'Payments',
   REVIEWS: 'Reviews',
   INVENTORY_TRANSACTIONS: 'InventoryTransactions',
+  STOCK_LOGS: 'StockLogs',
 });
 
 const UPLOAD_FOLDERS = Object.freeze({

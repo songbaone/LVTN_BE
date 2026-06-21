@@ -80,10 +80,34 @@ const uploadProductImages = handleUpload(productImageUpload.array('images', 10))
 const uploadCategoryImage = handleUpload(categoryImageUpload.single('image'));
 const uploadUserAvatar = handleUpload(avatarUpload.single('avatar'));
 
+// ── Excel Upload Middleware ────────────────────────────────────────
+const ALLOWED_EXCEL_TYPES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+];
+
+const excelStorage = multer.memoryStorage();
+
+function excelFileFilter(_req, file, cb) {
+  if (!ALLOWED_EXCEL_TYPES.includes(file.mimetype)) {
+    return cb(new Error('Only Excel files (.xlsx, .xls) are allowed'));
+  }
+  return cb(null, true);
+}
+
+const excelUpload = multer({
+  storage: excelStorage,
+  limits: { fileSize: env.UPLOAD_MAX_FILE_SIZE },
+  fileFilter: excelFileFilter,
+});
+
+const uploadExcelFile = handleUpload(excelUpload.single('file'));
+
 module.exports = {
   uploadBrandLogo,
   uploadProductImage,
   uploadProductImages,
   uploadCategoryImage,
   uploadUserAvatar,
+  uploadExcelFile,
 };
