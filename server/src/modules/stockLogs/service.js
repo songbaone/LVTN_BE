@@ -136,8 +136,11 @@ async function listStockLogs(queryParams) {
   }
 
   if (date_to) {
-    countQuery.where('StockLogs.created_at', '<=', new Date(date_to));
-    listQuery.where('StockLogs.created_at', '<=', new Date(date_to));
+    const nextDay = new Date(date_to);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    countQuery.where('StockLogs.created_at', '<', nextDay);
+    listQuery.where('StockLogs.created_at', '<', nextDay);
   }
 
   const countResult = await countQuery.count({ total: 'StockLogs.log_id' });
@@ -355,14 +358,22 @@ async function previewRollback(referenceCode) {
 
   const affectedVariants = [];
   for (const log of logs) {
-    const variant = await db(TABLES.PRODUCT_VARIANTS)
-      .where({ variant_id: log.variant_id })
+    const variant = await db(TABLES.PRODUCT_VARIANTS + ' as pv')
+      .leftJoin(TABLES.PRODUCTS + ' as p', 'pv.product_id', 'p.product_id')
+      .select(
+        'pv.variant_id',
+        'pv.sku',
+        'pv.stock_quantity',
+        'p.product_name'
+      )
+      .where('pv.variant_id', log.variant_id)
       .first();
 
     affectedVariants.push({
       variant_id: log.variant_id,
-      sku: variant ? variant.sku : 'Unknown',
-      current_stock: variant ? Number(variant.stock_quantity) : 0,
+      product_name: variant?.product_name || 'Unknown Product',
+      sku: variant?.sku || 'Unknown',
+      current_stock: Number(variant?.stock_quantity || 0),
       target_rollback_stock: log.old_quantity,
       log_old_quantity: log.old_quantity,
       log_change_quantity: log.change_quantity,
