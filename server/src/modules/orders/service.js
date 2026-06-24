@@ -11,6 +11,7 @@ const {
 } = require("../../utils/pagination");
 const { generateUniqueOrderCode } = require("../../utils/orderCode");
 const { buildVNPayUrl } = require("../../service/vnpay.service");
+const { calculateSellingPrice } = require("../../utils/pricing");
 const axios = require("axios");
 
 function parseOrderId(orderId) {
@@ -99,13 +100,24 @@ async function loadCartItems(cartId, trx = db) {
       `${TABLES.PRODUCT_VARIANTS}.size`,
       `${TABLES.PRODUCT_VARIANTS}.color`,
       `${TABLES.PRODUCT_VARIANTS}.material`,
+      `${TABLES.PRODUCT_VARIANTS}.additional_price`,
       `${TABLES.PRODUCTS}.product_id`,
       `${TABLES.PRODUCTS}.product_name`,
       `${TABLES.PRODUCTS}.price`,
+      `${TABLES.PRODUCTS}.discount_price`,
+      `${TABLES.PRODUCTS}.weight`,
     )
     .where(`${TABLES.CART_ITEMS}.cart_id`, cartId);
 
-  return cartItems;
+  // Map effective_price onto each item
+  return cartItems.map((item) => ({
+    ...item,
+    effective_price: calculateSellingPrice(
+      item.price,
+      item.discount_price,
+      item.additional_price,
+    ),
+  }));
 }
 
 async function validateStockForCartItems(cartItems, trx = db) {
@@ -120,7 +132,10 @@ async function validateStockForCartItems(cartItems, trx = db) {
 }
 
 function calculateSubtotal(cartItems) {
-  return cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  return cartItems.reduce(
+    (sum, item) => sum + item.effective_price * item.quantity,
+    0,
+  );
 }
 
 async function validateAndApplyCoupon(couponCode, orderAmount, trx = db) {
@@ -316,7 +331,7 @@ async function checkout(
     console.log(paymentUrl);
 
     for (const item of cartItems) {
-      const unitPrice = item.price;
+      const unitPrice = item.effective_price;
       const totalPrice = unitPrice * item.quantity;
 
       await trx(TABLES.ORDER_DETAILS).insert({
@@ -387,6 +402,7 @@ async function getOrders(userId, queryParams) {
       "order_code",
       "total_amount",
       "discount_amount",
+      "shipping_fee",
       "final_amount",
       "order_status",
       "created_at",
@@ -408,6 +424,7 @@ async function getOrders(userId, queryParams) {
       order_code: order.order_code,
       total_amount: parseFloat(order.total_amount),
       discount_amount: parseFloat(order.discount_amount),
+      shipping_fee: parseFloat(order.shipping_fee),
       final_amount: parseFloat(order.final_amount),
       status: order.order_status,
       created_at: order.created_at,
@@ -471,22 +488,22 @@ async function getOrderById(userId, orderIdParam) {
     },
     address: address
       ? {
-          address_id: address.address_id,
-          receiver_name: address.receiver_name,
-          receiver_phone: address.receiver_phone,
-          province: address.province,
-          ward: address.ward,
-          detail_address: address.detail_address,
-        }
+        address_id: address.address_id,
+        receiver_name: address.receiver_name,
+        receiver_phone: address.receiver_phone,
+        province: address.province,
+        ward: address.ward,
+        detail_address: address.detail_address,
+      }
       : null,
     coupon: coupon
       ? {
-          coupon_id: coupon.coupon_id,
-          coupon_code: coupon.coupon_code,
-          coupon_name: coupon.coupon_name,
-          discount_type: coupon.discount_type,
-          discount_value: parseFloat(coupon.discount_value),
-        }
+        coupon_id: coupon.coupon_id,
+        coupon_code: coupon.coupon_code,
+        coupon_name: coupon.coupon_name,
+        discount_type: coupon.discount_type,
+        discount_value: parseFloat(coupon.discount_value),
+      }
       : null,
     order_details: orderDetails.map((detail) => ({
       order_detail_id: detail.order_detail_id,
@@ -656,39 +673,39 @@ async function getAdminOrderById(orderIdParam) {
     },
     customer: customer
       ? {
-          user_id: customer.user_id,
-          full_name: customer.full_name,
-          email: customer.email,
-          phone: customer.phone,
-        }
+        user_id: customer.user_id,
+        full_name: customer.full_name,
+        email: customer.email,
+        phone: customer.phone,
+      }
       : null,
     address: address
       ? {
-          address_id: address.address_id,
-          receiver_name: address.receiver_name,
-          receiver_phone: address.receiver_phone,
-          province: address.province,
-          ward: address.ward,
-          detail_address: address.detail_address,
-        }
+        address_id: address.address_id,
+        receiver_name: address.receiver_name,
+        receiver_phone: address.receiver_phone,
+        province: address.province,
+        ward: address.ward,
+        detail_address: address.detail_address,
+      }
       : null,
     coupon: coupon
       ? {
-          coupon_id: coupon.coupon_id,
-          coupon_code: coupon.coupon_code,
-          coupon_name: coupon.coupon_name,
-          discount_type: coupon.discount_type,
-          discount_value: parseFloat(coupon.discount_value),
-        }
+        coupon_id: coupon.coupon_id,
+        coupon_code: coupon.coupon_code,
+        coupon_name: coupon.coupon_name,
+        discount_type: coupon.discount_type,
+        discount_value: parseFloat(coupon.discount_value),
+      }
       : null,
     payment: payment
       ? {
-          payment_id: payment.payment_id,
-          payment_code: payment.payment_code,
-          amount: parseFloat(payment.amount),
-          payment_status: payment.payment_status,
-          paid_at: payment.paid_at,
-        }
+        payment_id: payment.payment_id,
+        payment_code: payment.payment_code,
+        amount: parseFloat(payment.amount),
+        payment_status: payment.payment_status,
+        paid_at: payment.paid_at,
+      }
       : null,
     order_details: orderDetails.map((detail) => ({
       order_detail_id: detail.order_detail_id,
