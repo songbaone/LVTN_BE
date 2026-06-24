@@ -16,6 +16,8 @@ const adminOrderRoutes = require("../modules/orders/admin.routes");
 const dashboardRoutes = require("../modules/dashboard/routes");
 const stocksRoutes = require("../modules/stocks/routes");
 const stockLogsRoutes = require("../modules/stockLogs/routes");
+const productVariantsRoutes = require("../modules/product-variants/routes");
+const variantRoutes = require("../modules/product-variants/variant.routes");
 
 const router = express.Router();
 
@@ -37,5 +39,7 @@ router.use("/admin/orders", adminOrderRoutes);
 router.use("/admin/dashboard", dashboardRoutes);
 router.use("/stocks", stocksRoutes);
 router.use("/stock-logs", stockLogsRoutes);
+router.use("/products", productVariantsRoutes);
+router.use("/variants", variantRoutes);
 
 module.exports = router;
