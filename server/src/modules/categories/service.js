@@ -63,6 +63,8 @@ function mapTreeNode(record) {
     product_count: 0,
     total_product_count: 0,
     children: [],
+    created_at: record.created_at,
+    updated_at: record.updated_at,
   };
 }
 
