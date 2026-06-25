@@ -142,13 +142,23 @@ async function register({ full_name, email, password }) {
   const customerRole = await getRoleByName(ROLES.CUSTOMER);
   const { password_hash, salt } = await hashPassword(password);
 
-  await db(TABLES.USERS).insert({
-    full_name,
-    email,
-    password_hash,
-    salt,
-    role_id: customerRole.role_id,
-    status: 1,
+  await db.transaction(async (trx) => {
+    await trx(TABLES.USERS).insert({
+      full_name,
+      email,
+      password_hash,
+      salt,
+      role_id: customerRole.role_id,
+      status: 1,
+    });
+
+    const user = await trx(TABLES.USERS)
+      .where({ email })
+      .first();
+
+    await trx(TABLES.CART).insert({
+      user_id: user.user_id,
+    });
   });
 
   const user = await findUserByEmail(email);

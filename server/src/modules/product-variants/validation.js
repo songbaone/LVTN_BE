@@ -132,6 +132,10 @@ const updateVariantValidation = [
     .withMessage('SKU cannot be empty')
     .isLength({ max: 100 })
     .withMessage('SKU must not exceed 100 characters'),
+  body('status')
+    .optional()
+    .isInt({ min: 0, max: 1 })
+    .withMessage('Status must be either 0 (inactive) or 1 (active)'),
   body().custom((_, { req }) => {
     const variantFields = [
       'size',
@@ -140,6 +144,7 @@ const updateVariantValidation = [
       'additional_price',
       'stock_quantity',
       'sku',
+      'status',
     ];
 
     const hasField = variantFields.some(

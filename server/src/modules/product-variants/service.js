@@ -12,6 +12,7 @@ const VARIANT_COLUMNS = [
   'additional_price',
   'stock_quantity',
   'sku',
+  'status',
   'created_at',
   'updated_at',
 ];
@@ -30,6 +31,7 @@ function mapVariant(record) {
     additional_price: Number(record.additional_price ?? 0),
     stock_quantity: Number(record.stock_quantity ?? 0),
     sku: record.sku,
+    status: record.status,
     created_at: record.created_at,
     updated_at: record.updated_at,
   };
@@ -94,7 +96,7 @@ async function ensureSkuUnique({
 
 async function getAllVariants(queryParams) {
   const { page, limit, offset } = getPagination(queryParams, { maxLimit: 1000 });
-  const { size, color, material, min_price, max_price, min_stock, max_stock, sku, product_id, search } = queryParams;
+  const { size, color, material, min_price, max_price, min_stock, max_stock, sku, product_id, search, status } = queryParams;
 
   // Build count query for total
   let countQuery = db(TABLES.PRODUCT_VARIANTS);
@@ -184,6 +186,10 @@ async function getAllVariants(queryParams) {
 
   if (product_id) {
     dataQuery.where('product_id', parseInt(product_id, 10));
+  }
+
+  if (status) {
+    dataQuery.where('status', parseInt(status, 10));
   }
 
   if (search) {
@@ -291,6 +297,10 @@ async function updateVariant(variantId, body) {
   if (body.sku !== undefined) {
     await ensureSkuUnique({ sku: body.sku, excludeVariantId: variantIdNum });
     updateData.sku = body.sku;
+  }
+
+  if (body.status !== undefined) {
+    updateData.status = parseInt(body.status, 10);
   }
 
   if (Object.keys(updateData).length > 0) {
