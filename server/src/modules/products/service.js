@@ -532,6 +532,31 @@ async function getProducts(queryParams) {
   };
 }
 
+async function getProductVariants(productId) {
+  const variants = await db(TABLES.PRODUCT_VARIANTS)
+    .select(
+      'variant_id',
+      'size',
+      'color',
+      'material',
+      'additional_price',
+      'stock_quantity',
+      'sku'
+    )
+    .where({ product_id: productId })
+    .orderBy('variant_id', 'asc');
+
+  return variants.map((v) => ({
+    variant_id: v.variant_id,
+    size: v.size ?? null,
+    color: v.color ?? null,
+    material: v.material ?? null,
+    additional_price: Number(v.additional_price ?? 0),
+    stock_quantity: Number(v.stock_quantity ?? 0),
+    sku: v.sku,
+  }));
+}
+
 async function getProductById(productIdParam) {
   const productId = parseProductId(productIdParam);
 
@@ -543,9 +568,10 @@ async function getProductById(productIdParam) {
     throw new AppError('Product not found', 404);
   }
 
-  const [images, agg] = await Promise.all([
+  const [images, agg, variants] = await Promise.all([
     getProductImages(productId),
     getVariantAggregates([productId]),
+    getProductVariants(productId),
   ]);
 
   const mainImage = images.find((img) => img.is_main) || images[0] || null;
@@ -558,6 +584,7 @@ async function getProductById(productIdParam) {
       images,
       variant_count: aggs.variant_count || 0,
       total_stock: aggs.total_stock || 0,
+      variants,
     },
     category: mapCategoryInfo(record),
     brand: mapBrandInfo(record),

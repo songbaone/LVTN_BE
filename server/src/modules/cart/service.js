@@ -1,6 +1,7 @@
 const { db } = require('../../database/connection');
 const { TABLES } = require('../../config/constants');
 const { AppError } = require('../../middleware/errorHandler');
+const { calculateSellingPrice } = require('../../utils/pricing');
 
 function parseItemId(itemId) {
   const id = parseInt(itemId, 10);
@@ -37,6 +38,14 @@ function mapCartItem(record) {
     return null;
   }
 
+  const basePrice = record.discount_price &&
+    Number(record.discount_price) > 0
+      ? Number(record.discount_price)
+      : Number(record.price);
+  const additionalPrice = Number(record.additional_price || 0);
+  const unitPrice = basePrice + additionalPrice;
+  const subtotal = unitPrice * record.quantity;
+
   return {
     cart_item_id: record.cart_item_id,
 
@@ -60,13 +69,12 @@ function mapCartItem(record) {
     quantity: record.quantity,
 
     pricing: {
-      base_price: Number(record.price),
+      price: Number(record.price),
       discount_price: record.discount_price
         ? Number(record.discount_price)
         : null,
-      additional_price: Number(record.additional_price || 0),
-      unit_price: Number(record.unit_price),
-      subtotal: Number(record.subtotal),
+      additional_price: additionalPrice,
+      selling_price: unitPrice,
     },
   };
 }
@@ -191,40 +199,27 @@ async function getCart(userId) {
     `${TABLES.PRODUCT_VARIANTS}.size`,
     `${TABLES.PRODUCT_VARIANTS}.material`,
     `${TABLES.PRODUCT_VARIANTS}.stock_quantity`,
-    `${TABLES.PRODUCT_VARIANTS}.additional_price`,
-
-    // Unit Price
-    db.raw(`
-      (
-        ${TABLES.PRODUCTS}.price +
-        ISNULL(${TABLES.PRODUCT_VARIANTS}.additional_price, 0)
-      ) AS unit_price
-    `),
-
-    // Subtotal
-    db.raw(`
-      ${TABLES.CART_ITEMS}.quantity *
-      (
-        ${TABLES.PRODUCTS}.price +
-        ISNULL(${TABLES.PRODUCT_VARIANTS}.additional_price, 0)
-      ) AS subtotal
-    `)
+    `${TABLES.PRODUCT_VARIANTS}.additional_price`
   )
   .where(
     `${TABLES.CART_ITEMS}.cart_id`,
     cart.cart_id
   );
 
+  const mappedItems = items.map(mapCartItem);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalUniqueItems = items.length;
-  const subtotalAmount = items.reduce((sum, item) => sum + parseFloat(item.subtotal), 0);
+  const subtotalAmount = mappedItems.reduce(
+    (sum, item) => sum + item.pricing.selling_price * item.quantity,
+    0,
+  );
 
   return {
     cart_id: cart.cart_id,
     total_unique_items: totalUniqueItems,
     total_items: totalItems,
     subtotal_amount: subtotalAmount,
-    items: items.map(mapCartItem),
+    items: mappedItems,
   };
 }
 
