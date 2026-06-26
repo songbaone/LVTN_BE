@@ -18,7 +18,8 @@ const stocksRoutes = require("../modules/stocks/routes");
 const stockLogsRoutes = require("../modules/stockLogs/routes");
 const productVariantsRoutes = require("../modules/product-variants/routes");
 const variantRoutes = require("../modules/product-variants/variant.routes");
-
+const reviewsRoutes = require("../modules/reviews/routes");
+const adminReviewsRoutes = require("../modules/reviews/admin.routes");
 const router = express.Router();
 
 router.use("/auth", authRoutes);
@@ -41,5 +42,9 @@ router.use("/stocks", stocksRoutes);
 router.use("/stock-logs", stockLogsRoutes);
 router.use("/products", productVariantsRoutes);
 router.use("/variants", variantRoutes);
+
+router.use("/products", reviewsRoutes);
+router.use("/admin/reviews", adminReviewsRoutes);
+router.use("/reviews", reviewsRoutes);
 
 module.exports = router;

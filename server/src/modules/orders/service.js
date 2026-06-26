@@ -469,6 +469,7 @@ async function getOrderById(userId, orderIdParam) {
       `${TABLES.PRODUCT_VARIANTS}.color`,
       `${TABLES.PRODUCT_VARIANTS}.material`,
       `${TABLES.PRODUCTS}.product_name`,
+      `${TABLES.PRODUCTS}.product_id`,
     )
     .where(`${TABLES.ORDER_DETAILS}.order_id`, orderId);
 
@@ -508,6 +509,7 @@ async function getOrderById(userId, orderIdParam) {
     order_details: orderDetails.map((detail) => ({
       order_detail_id: detail.order_detail_id,
       product_name: detail.product_name,
+      product_id: detail.product_id,
       sku: detail.sku,
       color: detail.color,
       size: detail.size,
@@ -515,6 +517,7 @@ async function getOrderById(userId, orderIdParam) {
       quantity: detail.quantity,
       unit_price: parseFloat(detail.unit_price),
       subtotal: parseFloat(detail.total_price),
+
     })),
   };
 }
