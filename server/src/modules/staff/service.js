@@ -1,9 +1,12 @@
-const fs = require('fs');
-const { db } = require('../../database/connection');
-const { TABLES, ROLES } = require('../../config/constants');
-const { AppError } = require('../../middleware/errorHandler');
-const { getPagination, buildPaginationMeta } = require('../../utils/pagination');
-const { hashPassword } = require('../../utils/password');
+const fs = require("fs");
+const { db } = require("../../database/connection");
+const { TABLES, ROLES } = require("../../config/constants");
+const { AppError } = require("../../middleware/errorHandler");
+const {
+  getPagination,
+  buildPaginationMeta,
+} = require("../../utils/pagination");
+const { hashPassword } = require("../../utils/password");
 
 function removeUploadedFile(file) {
   if (file?.path && fs.existsSync(file.path)) {
@@ -15,7 +18,7 @@ function parseStaffId(staffId) {
   const id = parseInt(staffId, 10);
 
   if (Number.isNaN(id) || id < 1) {
-    throw new AppError('Invalid staff ID', 400);
+    throw new AppError("Invalid staff ID", 400);
   }
 
   return id;
@@ -50,11 +53,11 @@ function mapStaffDetail(record) {
 async function getStaffRoleId() {
   const role = await db(TABLES.ROLES)
     .where({ role_name: ROLES.STAFF })
-    .select('role_id')
+    .select("role_id")
     .first();
 
   if (!role) {
-    throw new AppError('Staff role is not configured', 500);
+    throw new AppError("Staff role is not configured", 500);
   }
 
   return role.role_id;
@@ -63,39 +66,39 @@ async function getStaffRoleId() {
 function buildStaffListQuery(staffRoleId) {
   return db(TABLES.USERS)
     .select(
-      'Users.user_id',
-      'Users.full_name',
-      'Users.email',
-      'Users.phone',
-      'Users.status',
-      'Users.created_at'
+      "Users.user_id",
+      "Users.full_name",
+      "Users.email",
+      "Users.phone",
+      "Users.status",
+      "Users.created_at",
     )
-    .where('Users.role_id', staffRoleId);
+    .where("Users.role_id", staffRoleId);
 }
 
 function applyStaffFilters(query, filters) {
   if (filters.full_name) {
-    query.where('Users.full_name', 'like', `%${filters.full_name}%`);
+    query.where("Users.full_name", "like", `%${filters.full_name}%`);
   }
 
   if (filters.email) {
-    query.where('Users.email', 'like', `%${filters.email}%`);
+    query.where("Users.email", "like", `%${filters.email}%`);
   }
 
   if (filters.phone) {
-    query.where('Users.phone', 'like', `%${filters.phone}%`);
+    query.where("Users.phone", "like", `%${filters.phone}%`);
   }
 
   if (filters.status !== undefined && filters.status !== null) {
-    query.where('Users.status', filters.status);
+    query.where("Users.status", filters.status);
   }
 
   if (filters.from_date) {
-    query.where('Users.created_at', '>=', filters.from_date);
+    query.where("Users.created_at", ">=", filters.from_date);
   }
 
   if (filters.to_date) {
-    query.where('Users.created_at', '<=', filters.to_date);
+    query.where("Users.created_at", "<=", filters.to_date);
   }
 
   return query;
@@ -117,16 +120,16 @@ async function getStaffList(queryParams) {
     to_date: queryParams.to_date || null,
   };
 
-  let countQuery = db(TABLES.USERS).where('role_id', staffRoleId);
+  let countQuery = db(TABLES.USERS).where("role_id", staffRoleId);
   countQuery = applyStaffFilters(countQuery, filters);
-  const countResult = await countQuery.count({ total: '*' });
+  const countResult = await countQuery.count({ total: "*" });
   const total = Number(countResult[0]?.total ?? 0);
 
   const staffQuery = applyStaffFilters(
     buildStaffListQuery(staffRoleId),
-    filters
+    filters,
   )
-    .orderBy('Users.created_at', 'desc')
+    .orderBy("Users.created_at", "desc")
     .offset(offset)
     .limit(limit);
 
@@ -144,19 +147,19 @@ async function findStaffById(staffIdParam) {
 
   const record = await db(TABLES.USERS)
     .select(
-      'Users.user_id',
-      'Users.full_name',
-      'Users.email',
-      'Users.phone',
-      'Users.gender',
-      'Users.birth_date',
-      'Users.avatar',
-      'Users.status',
-      'Users.created_at',
-      'Users.updated_at'
+      "Users.user_id",
+      "Users.full_name",
+      "Users.email",
+      "Users.phone",
+      "Users.gender",
+      "Users.birth_date",
+      "Users.avatar",
+      "Users.status",
+      "Users.created_at",
+      "Users.updated_at",
     )
-    .where('Users.user_id', staffId)
-    .where('Users.role_id', staffRoleId)
+    .where("Users.user_id", staffId)
+    .where("Users.role_id", staffRoleId)
     .first();
 
   return record;
@@ -166,7 +169,7 @@ async function getStaffById(staffIdParam) {
   const record = await findStaffById(staffIdParam);
 
   if (!record) {
-    throw new AppError('Staff not found', 404);
+    throw new AppError("Staff not found", 404);
   }
 
   return { staff: mapStaffDetail(record) };
@@ -182,7 +185,7 @@ async function ensureEmailAvailable(email, excludeUserId = null) {
   const existing = await query.first();
 
   if (existing) {
-    throw new AppError('Email is already registered', 409);
+    throw new AppError("Email is already registered", 409);
   }
 }
 
@@ -200,7 +203,7 @@ async function ensurePhoneAvailable(phone, excludeUserId = null) {
   const existing = await query.first();
 
   if (existing) {
-    throw new AppError('Phone number is already in use', 409);
+    throw new AppError("Phone number is already in use", 409);
   }
 }
 
@@ -208,7 +211,7 @@ async function ensureUserExists(userId) {
   const user = await db(TABLES.USERS).where({ user_id: userId }).first();
 
   if (!user) {
-    throw new AppError('Staff not found', 404);
+    throw new AppError("Staff not found", 404);
   }
 
   return user;
@@ -225,20 +228,20 @@ async function createStaff(data) {
 
   const { password_hash, salt } = await hashPassword(data.password);
 
- const inserted = await db(TABLES.USERS)
-  .insert({
-    full_name: data.full_name,
-    email: data.email,
-    phone: data.phone || null,
-    gender: data.gender || null,
-    birth_date: data.birth_date || null,
-    avatar: data.avatar || null,
-    password_hash,
-    salt,
-    role_id: staffRoleId,
-    status: 1,
-  })
-  .returning('user_id');
+  const inserted = await db(TABLES.USERS)
+    .insert({
+      full_name: data.full_name,
+      email: data.email,
+      phone: data.phone || null,
+      gender: data.gender || null,
+      birth_date: data.birth_date || null,
+      avatar: data.avatar || null,
+      password_hash,
+      salt,
+      role_id: staffRoleId,
+      status: 1,
+    })
+    .returning("user_id");
 
   return getStaffById(inserted[0].user_id);
 }
@@ -283,7 +286,7 @@ async function updateStaff(staffIdParam, data, file = null) {
   }
 
   if (Object.keys(updateData).length === 0) {
-    throw new AppError('No valid fields to update', 400);
+    throw new AppError("No valid fields to update", 400);
   }
 
   try {
@@ -301,7 +304,7 @@ async function lockStaff(staffIdParam) {
   const record = await findStaffById(staffId);
 
   if (!record) {
-    throw new AppError('Staff not found', 404);
+    throw new AppError("Staff not found", 404);
   }
 
   await db(TABLES.USERS).where({ user_id: staffId }).update({ status: 0 });
@@ -314,7 +317,7 @@ async function unlockStaff(staffIdParam) {
   const record = await findStaffById(staffId);
 
   if (!record) {
-    throw new AppError('Staff not found', 404);
+    throw new AppError("Staff not found", 404);
   }
 
   await db(TABLES.USERS).where({ user_id: staffId }).update({ status: 1 });
@@ -326,16 +329,19 @@ async function getStaffStatistics() {
   const staffRoleId = await getStaffRoleId();
 
   const [totalResult, activeResult, lockedResult] = await Promise.all([
-    db(TABLES.USERS).where('role_id', staffRoleId).count({ count: '*' }).first(),
     db(TABLES.USERS)
-      .where('role_id', staffRoleId)
-      .where('status', 1)
-      .count({ count: '*' })
+      .where("role_id", staffRoleId)
+      .count({ count: "*" })
       .first(),
     db(TABLES.USERS)
-      .where('role_id', staffRoleId)
-      .where('status', 0)
-      .count({ count: '*' })
+      .where("role_id", staffRoleId)
+      .where("status", 1)
+      .count({ count: "*" })
+      .first(),
+    db(TABLES.USERS)
+      .where("role_id", staffRoleId)
+      .where("status", 0)
+      .count({ count: "*" })
       .first(),
   ]);
 
