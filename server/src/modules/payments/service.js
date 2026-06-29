@@ -150,8 +150,63 @@ async function updatePaymentStatus(paymentIdParam, paymentStatus) {
   return await getPaymentById(paymentId);
 }
 
+async function confirmPayment(userId, orderCode) {
+  if (!orderCode || typeof orderCode !== 'string' || !orderCode.trim()) {
+    throw new AppError('Order code is required', 400);
+  }
+
+  return await db.transaction(async (trx) => {
+    // 1. Find the payment by joining with the order to verify ownership
+    const payment = await trx(`${TABLES.PAYMENTS} as p`)
+      .join(`${TABLES.ORDERS} as o`, 'p.order_id', 'o.order_id')
+      .where('o.order_code', orderCode.trim())
+      .select('p.*', 'o.user_id', 'o.order_code')
+      .first();
+
+    if (!payment) {
+      throw new AppError('Payment not found', 404);
+    }
+
+    // 2. Ensure the payment/order belongs to the authenticated user
+    if (payment.user_id !== userId) {
+      throw new AppError('Payment not found', 404);
+    }
+
+    // 3. Only allow updating Pending payments
+    if (payment.payment_status !== PAYMENT_STATUS.PENDING) {
+      throw new AppError(
+        `Cannot confirm payment with status ${payment.payment_status}`,
+        400
+      );
+    }
+
+    // 4. Update payment status to Paid with timestamp
+    await trx(TABLES.PAYMENTS)
+      .where({ payment_id: payment.payment_id })
+      .update({
+        payment_status: PAYMENT_STATUS.PAID,
+        paid_at: trx.fn.now(),
+      });
+
+    // 5. Sync the order's payment status
+    await trx(TABLES.ORDERS)
+      .where({ order_id: payment.order_id })
+      .update({ payment_status: PAYMENT_STATUS.PAID });
+
+    return {
+      payment_id: payment.payment_id,
+      order_id: payment.order_id,
+      order_code: payment.order_code,
+      payment_status: PAYMENT_STATUS.PAID,
+      paid_at: new Date().toISOString(),
+      amount: parseFloat(payment.amount),
+    };
+  });
+}
+
 module.exports = {
   getPayments,
   getPaymentById,
   updatePaymentStatus,
+  confirmPayment,
 };

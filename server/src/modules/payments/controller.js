@@ -34,8 +34,22 @@ async function updatePaymentStatus(req, res, next) {
   }
 }
 
+async function confirmPayment(req, res, next) {
+  try {
+    const payment = await paymentsService.confirmPayment(
+      req.user.user_id,
+      req.body.vnp_TxnRef
+    );
+
+    return sendSuccess(res, 'Payment confirmed successfully', payment);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getPayments,
   getPaymentById,
   updatePaymentStatus,
+  confirmPayment,
 };

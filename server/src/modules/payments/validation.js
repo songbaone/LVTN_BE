@@ -34,8 +34,18 @@ const updatePaymentStatusValidation = [
     .withMessage('Payment status must be Pending, Paid, Failed, or Refunded'),
 ];
 
+const confirmPaymentValidation = [
+  body('vnp_TxnRef')
+    .trim()
+    .notEmpty()
+    .withMessage('Order code is required')
+    .isString()
+    .withMessage('Order code must be a string'),
+];
+
 module.exports = {
   paymentIdParamValidation,
   listPaymentsQueryValidation,
   updatePaymentStatusValidation,
+  confirmPaymentValidation,
 };

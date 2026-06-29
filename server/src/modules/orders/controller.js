@@ -48,6 +48,33 @@ async function getOrderById(req, res, next) {
   }
 }
 
+async function previewOrder(req, res, next) {
+  try {
+    const result = await ordersService.calculateOrderPreview(
+      req.user.user_id,
+      req.body.address_id,
+      req.body.coupon_code,
+    );
+
+    const response = {
+      subtotal: parseFloat(result.subtotal),
+      discount_amount: parseFloat(result.discountAmount),
+      shipping_fee: parseFloat(result.shippingFee),
+      final_amount: parseFloat(result.finalAmount),
+      coupon: result.coupon
+        ? {
+            coupon_code: result.coupon.coupon_code,
+            discount_amount: parseFloat(result.discountAmount),
+          }
+        : null,
+    };
+
+    return sendSuccess(res, 'Order preview retrieved successfully', response);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function cancelOrder(req, res, next) {
   try {
     const order = await ordersService.cancelOrder(req.user.user_id, req.params.id);
@@ -94,4 +121,5 @@ module.exports = {
   getAdminOrders,
   getAdminOrderById,
   updateOrderStatus,
+  previewOrder,
 };

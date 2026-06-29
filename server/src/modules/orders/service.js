@@ -229,6 +229,73 @@ async function decreaseCouponQuantity(couponId, trx = db) {
     .decrement("quantity", 1);
 }
 
+async function calculateOrderPreview(
+  userId,
+  addressIdParam,
+  couponCode = null,
+  trx = db,
+) {
+  const addressId = parseAddressId(addressIdParam);
+
+  await ensureAddressBelongsToUser(userId, addressId, trx);
+  const cart = await getOrCreateCart(userId, trx);
+  const cartItems = await loadCartItems(cart.cart_id, trx);
+  const address = await trx(TABLES.ADDRESSES)
+    .where({ address_id: addressId })
+    .first();
+
+  if (cartItems.length === 0) {
+    throw new AppError("Cart is empty", 400);
+  }
+
+  const totalWeight = cartItems.reduce(
+    (sum, item) => sum + (item.weight || 0) * 1000 * item.quantity,
+    0,
+  );
+
+  await validateStockForCartItems(cartItems, trx);
+  const subtotal = calculateSubtotal(cartItems);
+
+  const shippingFee = await calculateShippingFee({
+    province: address.province,
+    district: address.district,
+    ward: address.ward,
+    weight: totalWeight,
+    value: subtotal,
+  });
+
+  let discountAmount = 0;
+  let coupon = null;
+  let couponId = null;
+
+  if (couponCode) {
+    const couponResult = await validateAndApplyCoupon(
+      couponCode,
+      subtotal,
+      trx,
+    );
+    discountAmount = couponResult.discount_amount;
+    coupon = couponResult.coupon;
+    couponId = coupon.coupon_id;
+  }
+
+  const finalAmount = subtotal - discountAmount + shippingFee;
+
+  return {
+    addressId,
+    cart,
+    cartItems,
+    address,
+    subtotal,
+    totalWeight,
+    shippingFee,
+    discountAmount,
+    coupon,
+    couponId,
+    finalAmount,
+  };
+}
+
 async function checkout(
   userId,
   addressIdParam,
@@ -236,51 +303,27 @@ async function checkout(
   paymentMethod = "COD",
   ipAddr = null,
 ) {
-  const addressId = parseAddressId(addressIdParam);
-
   const result = await db.transaction(async (trx) => {
-    await ensureAddressBelongsToUser(userId, addressId, trx);
-    const cart = await getOrCreateCart(userId, trx);
-    const cartItems = await loadCartItems(cart.cart_id, trx);
-    const address = await trx(TABLES.ADDRESSES)
-      .where({ address_id: addressId })
-      .first();
-    if (cartItems.length === 0) {
-      throw new AppError("Cart is empty", 400);
-    }
-
-    const totalWeight = cartItems.reduce(
-      (sum, item) => sum + (item.weight || 0) * 1000 * item.quantity,
-      0,
+    const preview = await calculateOrderPreview(
+      userId,
+      addressIdParam,
+      couponCode,
+      trx,
     );
 
-    await validateStockForCartItems(cartItems, trx);
-    const subtotal = calculateSubtotal(cartItems);
-    console.log("Address:", address);
-    const shippingFee = await calculateShippingFee({
-      province: address.province,
-      district: address.district,
-      ward: address.ward,
-      weight: totalWeight,
-      value: subtotal,
-    });
+    const {
+      addressId,
+      cart,
+      cartItems,
+      address,
+      subtotal,
+      shippingFee,
+      discountAmount,
+      coupon,
+      couponId,
+      finalAmount,
+    } = preview;
 
-    let discountAmount = 0;
-    let coupon = null;
-    let couponId = null;
-
-    if (couponCode) {
-      const couponResult = await validateAndApplyCoupon(
-        couponCode,
-        subtotal,
-        trx,
-      );
-      discountAmount = couponResult.discount_amount;
-      coupon = couponResult.coupon;
-      couponId = coupon.coupon_id;
-    }
-
-    const finalAmount = subtotal - discountAmount + shippingFee;
     const orderCode = await generateUniqueOrderCode();
 
     console.log("ORDER CODE:", orderCode);
@@ -888,4 +931,5 @@ module.exports = {
   getAdminOrders,
   getAdminOrderById,
   updateOrderStatus,
+  calculateOrderPreview,
 };

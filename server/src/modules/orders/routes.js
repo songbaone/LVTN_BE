@@ -10,6 +10,7 @@ const {
   listOrdersQueryValidation,
   adminListOrdersQueryValidation,
   updateOrderStatusValidation,
+  previewOrderValidation,
 } = require("./validation");
 
 const router = express.Router();
@@ -17,6 +18,7 @@ const router = express.Router();
 router.use(authenticate);
 router.use(authorize(ROLES.CUSTOMER));
 
+router.post("/preview", previewOrderValidation, validate, controller.previewOrder);
 router.post("/checkout", checkoutValidation, validate, controller.checkout);
 router.get("/", listOrdersQueryValidation, validate, controller.getOrders);
 router.get("/:id", orderIdParamValidation, validate, controller.getOrderById);

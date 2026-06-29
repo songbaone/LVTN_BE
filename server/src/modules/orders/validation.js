@@ -69,6 +69,18 @@ const adminListOrdersQueryValidation = [
     .withMessage('Invalid payment method'),
 ];
 
+const previewOrderValidation = [
+  body('address_id')
+    .isInt({ min: 1 })
+    .withMessage('Address ID is required and must be a positive integer')
+    .toInt(),
+  body('coupon_code')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Coupon code must not exceed 50 characters'),
+];
+
 const updateOrderStatusValidation = [
   param('id')
     .isInt({ min: 1 })
@@ -86,4 +98,5 @@ module.exports = {
   listOrdersQueryValidation,
   adminListOrdersQueryValidation,
   updateOrderStatusValidation,
+  previewOrderValidation,
 };
