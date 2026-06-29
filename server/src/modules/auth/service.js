@@ -263,14 +263,24 @@ async function googleLogin({ id_token: idToken }) {
     const randomPassword = crypto.randomBytes(32).toString('hex');
     const { password_hash, salt } = await hashPassword(randomPassword);
 
-    await db(TABLES.USERS).insert({
-      full_name: googleProfile.name || email.split('@')[0],
-      email,
-      password_hash,
-      salt,
-      avatar: googleProfile.picture || null,
-      role_id: customerRole.role_id,
-      status: 1,
+    await db.transaction(async (trx) => {
+      await trx(TABLES.USERS).insert({
+        full_name: googleProfile.name || email.split('@')[0],
+        email,
+        password_hash,
+        salt,
+        avatar: googleProfile.picture || null,
+        role_id: customerRole.role_id,
+        status: 1,
+      });
+
+      const createdUser = await trx(TABLES.USERS)
+        .where({ email })
+        .first();
+
+      await trx(TABLES.CART).insert({
+        user_id: createdUser.user_id,
+      });
     });
 
     user = await findUserByEmail(email);
