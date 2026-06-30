@@ -513,6 +513,7 @@ async function getOrderById(userId, orderIdParam) {
       `${TABLES.PRODUCT_VARIANTS}.material`,
       `${TABLES.PRODUCTS}.product_name`,
       `${TABLES.PRODUCTS}.product_id`,
+      `${TABLES.PRODUCTS}.thumbnail`,
     )
     .where(`${TABLES.ORDER_DETAILS}.order_id`, orderId);
 
@@ -532,27 +533,28 @@ async function getOrderById(userId, orderIdParam) {
     },
     address: address
       ? {
-        address_id: address.address_id,
-        receiver_name: address.receiver_name,
-        receiver_phone: address.receiver_phone,
-        province: address.province,
-        ward: address.ward,
-        detail_address: address.detail_address,
-      }
+          address_id: address.address_id,
+          receiver_name: address.receiver_name,
+          receiver_phone: address.receiver_phone,
+          province: address.province,
+          ward: address.ward,
+          detail_address: address.detail_address,
+        }
       : null,
     coupon: coupon
       ? {
-        coupon_id: coupon.coupon_id,
-        coupon_code: coupon.coupon_code,
-        coupon_name: coupon.coupon_name,
-        discount_type: coupon.discount_type,
-        discount_value: parseFloat(coupon.discount_value),
-      }
+          coupon_id: coupon.coupon_id,
+          coupon_code: coupon.coupon_code,
+          coupon_name: coupon.coupon_name,
+          discount_type: coupon.discount_type,
+          discount_value: parseFloat(coupon.discount_value),
+        }
       : null,
     order_details: orderDetails.map((detail) => ({
       order_detail_id: detail.order_detail_id,
       product_name: detail.product_name,
       product_id: detail.product_id,
+      thumbnail: detail.thumbnail,
       sku: detail.sku,
       color: detail.color,
       size: detail.size,
@@ -560,7 +562,6 @@ async function getOrderById(userId, orderIdParam) {
       quantity: detail.quantity,
       unit_price: parseFloat(detail.unit_price),
       subtotal: parseFloat(detail.total_price),
-
     })),
   };
 }
@@ -719,39 +720,39 @@ async function getAdminOrderById(orderIdParam) {
     },
     customer: customer
       ? {
-        user_id: customer.user_id,
-        full_name: customer.full_name,
-        email: customer.email,
-        phone: customer.phone,
-      }
+          user_id: customer.user_id,
+          full_name: customer.full_name,
+          email: customer.email,
+          phone: customer.phone,
+        }
       : null,
     address: address
       ? {
-        address_id: address.address_id,
-        receiver_name: address.receiver_name,
-        receiver_phone: address.receiver_phone,
-        province: address.province,
-        ward: address.ward,
-        detail_address: address.detail_address,
-      }
+          address_id: address.address_id,
+          receiver_name: address.receiver_name,
+          receiver_phone: address.receiver_phone,
+          province: address.province,
+          ward: address.ward,
+          detail_address: address.detail_address,
+        }
       : null,
     coupon: coupon
       ? {
-        coupon_id: coupon.coupon_id,
-        coupon_code: coupon.coupon_code,
-        coupon_name: coupon.coupon_name,
-        discount_type: coupon.discount_type,
-        discount_value: parseFloat(coupon.discount_value),
-      }
+          coupon_id: coupon.coupon_id,
+          coupon_code: coupon.coupon_code,
+          coupon_name: coupon.coupon_name,
+          discount_type: coupon.discount_type,
+          discount_value: parseFloat(coupon.discount_value),
+        }
       : null,
     payment: payment
       ? {
-        payment_id: payment.payment_id,
-        payment_code: payment.payment_code,
-        amount: parseFloat(payment.amount),
-        payment_status: payment.payment_status,
-        paid_at: payment.paid_at,
-      }
+          payment_id: payment.payment_id,
+          payment_code: payment.payment_code,
+          amount: parseFloat(payment.amount),
+          payment_status: payment.payment_status,
+          paid_at: payment.paid_at,
+        }
       : null,
     order_details: orderDetails.map((detail) => ({
       order_detail_id: detail.order_detail_id,
