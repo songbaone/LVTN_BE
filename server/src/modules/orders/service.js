@@ -13,6 +13,7 @@ const { generateUniqueOrderCode } = require("../../utils/orderCode");
 const { buildVNPayUrl } = require("../../service/vnpay.service");
 const { calculateSellingPrice } = require("../../utils/pricing");
 const axios = require("axios");
+const { distinct } = require("../../config/knex");
 
 function parseOrderId(orderId) {
   const id = parseInt(orderId, 10);
@@ -538,6 +539,7 @@ async function getOrderById(userId, orderIdParam) {
           receiver_phone: address.receiver_phone,
           province: address.province,
           ward: address.ward,
+          district: address.district,
           detail_address: address.detail_address,
         }
       : null,
