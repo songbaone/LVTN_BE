@@ -26,6 +26,11 @@ router.get(
 );
 
 router.get(
+  "/dashboard",
+  controller.getDashboardStatistics,
+);
+
+router.get(
   "/:id",
   orderIdParamValidation,
   validate,

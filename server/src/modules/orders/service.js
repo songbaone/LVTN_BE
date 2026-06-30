@@ -534,23 +534,23 @@ async function getOrderById(userId, orderIdParam) {
     },
     address: address
       ? {
-          address_id: address.address_id,
-          receiver_name: address.receiver_name,
-          receiver_phone: address.receiver_phone,
-          province: address.province,
-          ward: address.ward,
-          district: address.district,
-          detail_address: address.detail_address,
-        }
+        address_id: address.address_id,
+        receiver_name: address.receiver_name,
+        receiver_phone: address.receiver_phone,
+        province: address.province,
+        ward: address.ward,
+        district: address.district,
+        detail_address: address.detail_address,
+      }
       : null,
     coupon: coupon
       ? {
-          coupon_id: coupon.coupon_id,
-          coupon_code: coupon.coupon_code,
-          coupon_name: coupon.coupon_name,
-          discount_type: coupon.discount_type,
-          discount_value: parseFloat(coupon.discount_value),
-        }
+        coupon_id: coupon.coupon_id,
+        coupon_code: coupon.coupon_code,
+        coupon_name: coupon.coupon_name,
+        discount_type: coupon.discount_type,
+        discount_value: parseFloat(coupon.discount_value),
+      }
       : null,
     order_details: orderDetails.map((detail) => ({
       order_detail_id: detail.order_detail_id,
@@ -722,39 +722,39 @@ async function getAdminOrderById(orderIdParam) {
     },
     customer: customer
       ? {
-          user_id: customer.user_id,
-          full_name: customer.full_name,
-          email: customer.email,
-          phone: customer.phone,
-        }
+        user_id: customer.user_id,
+        full_name: customer.full_name,
+        email: customer.email,
+        phone: customer.phone,
+      }
       : null,
     address: address
       ? {
-          address_id: address.address_id,
-          receiver_name: address.receiver_name,
-          receiver_phone: address.receiver_phone,
-          province: address.province,
-          ward: address.ward,
-          detail_address: address.detail_address,
-        }
+        address_id: address.address_id,
+        receiver_name: address.receiver_name,
+        receiver_phone: address.receiver_phone,
+        province: address.province,
+        ward: address.ward,
+        detail_address: address.detail_address,
+      }
       : null,
     coupon: coupon
       ? {
-          coupon_id: coupon.coupon_id,
-          coupon_code: coupon.coupon_code,
-          coupon_name: coupon.coupon_name,
-          discount_type: coupon.discount_type,
-          discount_value: parseFloat(coupon.discount_value),
-        }
+        coupon_id: coupon.coupon_id,
+        coupon_code: coupon.coupon_code,
+        coupon_name: coupon.coupon_name,
+        discount_type: coupon.discount_type,
+        discount_value: parseFloat(coupon.discount_value),
+      }
       : null,
     payment: payment
       ? {
-          payment_id: payment.payment_id,
-          payment_code: payment.payment_code,
-          amount: parseFloat(payment.amount),
-          payment_status: payment.payment_status,
-          paid_at: payment.paid_at,
-        }
+        payment_id: payment.payment_id,
+        payment_code: payment.payment_code,
+        amount: parseFloat(payment.amount),
+        payment_status: payment.payment_status,
+        paid_at: payment.paid_at,
+      }
       : null,
     order_details: orderDetails.map((detail) => ({
       order_detail_id: detail.order_detail_id,
@@ -925,6 +925,108 @@ async function calculateShippingFee({
   }
 }
 
+/**
+ * Get aggregated dashboard statistics for admin orders.
+ * Uses SQL aggregate queries (COUNT, SUM, GROUP BY) for performance.
+ * Only Delivered orders contribute to revenue.
+ */
+async function getDashboardStatistics() {
+  // 1. Count orders by status
+  const statusCounts = await db(TABLES.ORDERS)
+    .select("order_status")
+    .count({ count: "order_id" })
+    .groupBy("order_status");
+
+  const statusMap = {};
+  let totalOrders = 0;
+
+  for (const row of statusCounts) {
+    const count = Number(row.count);
+
+    statusMap[row.order_status] = count;
+    totalOrders += count;
+  }
+
+  // 2. Total revenue (Delivered only)
+  const revenueResult = await db(TABLES.ORDERS)
+    .where("order_status", ORDER_STATUS.DELIVERED)
+    .sum({ total: "final_amount" })
+    .first();
+
+  const totalRevenue = parseFloat(revenueResult?.total || 0);
+
+  // 3. Today's statistics
+  const todayResult = await db(TABLES.ORDERS)
+    .select(
+      db.raw("COUNT(*) AS order_count"),
+      db.raw(
+        `
+        COALESCE(
+          SUM(
+            CASE
+              WHEN order_status = ? THEN final_amount
+              ELSE 0
+            END
+          ),
+          0
+        ) AS revenue
+        `,
+        [ORDER_STATUS.DELIVERED]
+      )
+    )
+    .whereRaw("CAST(created_at AS DATE) = CAST(GETDATE() AS DATE)")
+    .first();
+
+  const todayOrders = Number(todayResult?.order_count || 0);
+  const todayRevenue = parseFloat(todayResult?.revenue || 0);
+
+  // 4. Current month statistics
+  const monthResult = await db(TABLES.ORDERS)
+    .select(
+      db.raw("COUNT(*) AS order_count"),
+      db.raw(
+        `
+        COALESCE(
+          SUM(
+            CASE
+              WHEN order_status = ? THEN final_amount
+              ELSE 0
+            END
+          ),
+          0
+        ) AS revenue
+        `,
+        [ORDER_STATUS.DELIVERED]
+      )
+    )
+    .whereRaw(`
+      YEAR(created_at) = YEAR(GETDATE())
+      AND MONTH(created_at) = MONTH(GETDATE())
+    `)
+    .first();
+
+  const thisMonthOrders = Number(monthResult?.order_count || 0);
+  const thisMonthRevenue = parseFloat(monthResult?.revenue || 0);
+
+  return {
+    total_orders: totalOrders,
+
+    pending_orders: statusMap[ORDER_STATUS.PENDING] || 0,
+    confirmed_orders: statusMap[ORDER_STATUS.CONFIRMED] || 0,
+    shipping_orders: statusMap[ORDER_STATUS.SHIPPING] || 0,
+    delivered_orders: statusMap[ORDER_STATUS.DELIVERED] || 0,
+    cancelled_orders: statusMap[ORDER_STATUS.CANCELLED] || 0,
+
+    total_revenue: totalRevenue,
+
+    today_orders: todayOrders,
+    today_revenue: todayRevenue,
+
+    this_month_orders: thisMonthOrders,
+    this_month_revenue: thisMonthRevenue,
+  };
+}
+
 module.exports = {
   checkout,
   getOrders,
@@ -935,4 +1037,5 @@ module.exports = {
   getAdminOrderById,
   updateOrderStatus,
   calculateOrderPreview,
+  getDashboardStatistics,
 };

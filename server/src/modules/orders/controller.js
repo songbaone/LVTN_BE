@@ -113,6 +113,15 @@ async function updateOrderStatus(req, res, next) {
   }
 }
 
+async function getDashboardStatistics(req, res, next) {
+  try {
+    const result = await ordersService.getDashboardStatistics();
+    return sendSuccess(res, 'Dashboard retrieved successfully', result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   checkout,
   getOrders,
@@ -122,4 +131,5 @@ module.exports = {
   getAdminOrderById,
   updateOrderStatus,
   previewOrder,
+  getDashboardStatistics,
 };
