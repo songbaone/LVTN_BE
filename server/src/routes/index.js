@@ -21,6 +21,8 @@ const productVariantsRoutes = require("../modules/product-variants/routes");
 const variantRoutes = require("../modules/product-variants/variant.routes");
 const reviewsRoutes = require("../modules/reviews/routes");
 const adminReviewsRoutes = require("../modules/reviews/admin.routes");
+const chatRoutes = require("../modules/chat/routes");
+const adminChatRoutes = require("../modules/chat/admin.routes");
 const router = express.Router();
 
 router.use("/auth", authRoutes);
@@ -40,6 +42,7 @@ router.use("/payments", paymentsRoutes);
 router.use("/admin/payments", adminPaymentsRoutes);
 router.use("/admin/orders", adminOrderRoutes);
 router.use("/admin/dashboard", dashboardRoutes);
+router.use("/admin/chat", adminChatRoutes);
 router.use("/stocks", stocksRoutes);
 router.use("/stock-logs", stockLogsRoutes);
 router.use("/products", productVariantsRoutes);
@@ -48,5 +51,6 @@ router.use("/variants", variantRoutes);
 router.use("/products", reviewsRoutes);
 router.use("/admin/reviews", adminReviewsRoutes);
 router.use("/reviews", reviewsRoutes);
+router.use("/chat", chatRoutes);
 
 module.exports = router;

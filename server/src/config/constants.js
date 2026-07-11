@@ -36,6 +36,18 @@ const COUPON_DISCOUNT_TYPE = {
   FIXED: 'FIXED',
 };
 
+const CHAT_ROOM_STATUS = Object.freeze({
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+});
+
+const MESSAGE_TYPE = Object.freeze({
+  TEXT: 'TEXT',
+  IMAGE: 'IMAGE',
+  FILE: 'FILE',
+  SYSTEM: 'SYSTEM',
+});
+
 const TABLES = Object.freeze({
   ROLES: 'Roles',
   USERS: 'Users',
@@ -54,6 +66,9 @@ const TABLES = Object.freeze({
   REVIEWS: 'Reviews',
   INVENTORY_TRANSACTIONS: 'InventoryTransactions',
   STOCK_LOGS: 'StockLogs',
+  CHAT_ROOMS: 'ChatRooms',
+  CHAT_MESSAGES: 'ChatMessages',
+  CHAT_ATTACHMENTS: 'ChatAttachments',
 });
 
 const UPLOAD_FOLDERS = Object.freeze({
@@ -61,6 +76,7 @@ const UPLOAD_FOLDERS = Object.freeze({
   PRODUCTS: path.join(UPLOADS_DIR, 'products'),
   BRANDS: path.join(UPLOADS_DIR, 'brands'),
   CATEGORIES: path.join(UPLOADS_DIR, 'categories'),
+  CHAT: path.join(UPLOADS_DIR, 'chat'),
   TEMP: path.join(UPLOADS_DIR, 'temp'),
 });
 
@@ -74,6 +90,8 @@ module.exports = {
   PAYMENT_STATUS,
   INVENTORY_TRANSACTION_TYPE,
   COUPON_DISCOUNT_TYPE,
+  CHAT_ROOM_STATUS,
+  MESSAGE_TYPE,
   TABLES,
   UPLOAD_FOLDERS,
   API_PREFIX,

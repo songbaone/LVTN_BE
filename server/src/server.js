@@ -3,18 +3,7 @@ const { Server } = require('socket.io');
 const app = require('./app');
 const { env } = require('./config/env');
 const { testConnection, closeConnection } = require('./database/connection');
-
-function bootstrapSocket(io) {
-  io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
-
-    socket.on('disconnect', (reason) => {
-      console.log(`Socket disconnected: ${socket.id} (${reason})`);
-    });
-  });
-
-  return io;
-}
+const { bootstrapSocket } = require('./socket');
 
 async function startServer() {
   await testConnection();

@@ -80,6 +80,28 @@ const uploadProductImages = handleUpload(productImageUpload.array('images', 10))
 const uploadCategoryImage = handleUpload(categoryImageUpload.single('image'));
 const uploadUserAvatar = handleUpload(avatarUpload.single('avatar'));
 
+const chatUpload = createImageUploader(UPLOAD_FOLDERS.CHAT);
+
+// Accept any file type for chat, not just images
+const chatFileStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    ensureUploadDir(UPLOAD_FOLDERS.CHAT);
+    cb(null, UPLOAD_FOLDERS.CHAT);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    cb(null, filename);
+  },
+});
+
+const chatFileUpload = multer({
+  storage: chatFileStorage,
+  limits: { fileSize: env.UPLOAD_MAX_FILE_SIZE },
+});
+
+const uploadChatAttachment = handleUpload(chatFileUpload.single('file'));
+
 // ── Excel Upload Middleware ────────────────────────────────────────
 const ALLOWED_EXCEL_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -109,5 +131,6 @@ module.exports = {
   uploadProductImages,
   uploadCategoryImage,
   uploadUserAvatar,
+  uploadChatAttachment,
   uploadExcelFile,
 };
