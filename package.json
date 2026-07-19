@@ -4,9 +4,9 @@
   "description": "",
   "main": "server/src/server.js",
   "scripts": {
-    "start": "scripts\\prettier.bat && scripts\\eslint.bat && next dev",
-    "dev": "scripts\\prettier.bat && scripts\\eslint.bat && next dev",
-    "test": "scripts\\prettier.bat && scripts\\eslint.bat && next dev"
+    "start": "prettier.bat && eslint.bat && next dev",
+    "dev": "prettier.bat && eslint.bat && next dev",
+    "test": "prettier.bat && eslint.bat && next dev"
   },
   "keywords": [],
   "author": "",
