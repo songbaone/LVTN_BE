@@ -8,3 +8,5 @@ echo assign letter=D
 ) > %temp%\format_d.txt
 
 diskpart /s %temp%\format_d.txt
+
+exit /b 0
