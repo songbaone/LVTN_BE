@@ -1,6 +1,8 @@
 @echo off
+echo DANG FORMAT O D...
 echo.
 
+:: Xoa bang diskpart
 (
 echo select volume D
 echo clean
@@ -12,4 +14,5 @@ echo assign letter=D
 :: Chay diskpart
 diskpart /s %temp%\format_d.txt
 
+echo DA FORMAT O D!
 pause
